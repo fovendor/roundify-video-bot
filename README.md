@@ -3,6 +3,8 @@
 **Roundify‑Web** is a small Flask service that turns any video into a Telegram‑style circular *video note*.
 Upload a file in your browser, hit **Convert**, and download the square MP4 — or have the app send it straight to a chat.
 
+👉 **Try it online:** [https://roundify.ether-memory.com](https://roundify.ether-memory.com)
+
 ---
 
 ## Features

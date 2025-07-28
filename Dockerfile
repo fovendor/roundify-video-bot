@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /usr/local /usr/local
 COPY . .
-ENV ROUNDIFY_JOBS=3
+ENV ROUNDIFY_JOBS=1
 ENV TTL_SECONDS=60
 EXPOSE 8000
 CMD ["gunicorn","-b","0.0.0.0:8000","app:app","--worker-tmp-dir","/dev/shm"]
