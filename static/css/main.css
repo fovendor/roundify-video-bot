@@ -1,0 +1,180 @@
+:root {
+    --bg: #d3d3d3;
+    --sh-dark: #b3b3b3;
+    --sh-light: #f3f3f3;
+    --accent: #0e2647;
+}
+
+* {
+    box-sizing: border-box;
+    font-family: system-ui, sans-serif;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    color: var(--accent);
+}
+
+/* ── карточка ───────────────────────────── */
+.card {
+    background: var(--bg);
+    padding: 2rem;
+    border-radius: 1.5rem;
+    box-shadow: -14px -14px 28px var(--sh-light), 14px 14px 28px var(--sh-dark);
+    width: clamp(320px, 90vw, 420px);
+}
+
+h1 {
+    margin: 0 0 1.2rem;
+    text-align: center;
+    font-size: 1.4rem;
+}
+
+/* ── загрузка файла ─────────────────────── */
+label.upload {
+    display: block;
+    padding: 0.9rem;
+    border-radius: 1rem;
+    text-align: center;
+    cursor: pointer;
+    background: var(--bg);
+    box-shadow: inset -6px -6px 12px var(--sh-light),
+        inset 6px 6px 12px var(--sh-dark);
+    user-select: none;
+    margin-bottom: 1rem;
+    color: var(--accent);
+    transition: filter .15s;
+}
+
+label.upload:hover {
+    filter: brightness(.95);
+}
+
+input[type=file] {
+    display: none;
+}
+
+/* ── кнопка Convert ─────────────────────── */
+#convert {
+    width: 100%;
+    padding: 0.9rem;
+    border: none;
+    border-radius: 1rem;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: -4px -4px 8px var(--sh-light), 4px 4px 8px var(--sh-dark);
+    transition: transform .1s;
+}
+
+#convert:active {
+    transform: translateY(2px);
+    margin-bottom: 0;
+}
+
+/* ── стрелка-chevron ───────────────────── */
+.chevron {
+    position: relative;
+    display: block;
+    width: 32px;
+    height: 24px;
+    margin: 0.8rem auto 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.chevron span {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 4px;
+    background: var(--accent);
+    transform-origin: center;
+}
+
+/* закрыто: угол вниз */
+.chevron span:first-child {
+    transform: translateX(-10px) rotate(45deg);
+}
+
+.chevron span:last-child {
+    transform: translateX(10px) rotate(-45deg);
+}
+
+/* открыто: угол вверх */
+.chevron.open span:first-child {
+    transform: translateX(10px) rotate(45deg);
+}
+
+.chevron.open span:last-child {
+    transform: translateX(-10px) rotate(-45deg);
+}
+
+.chevron span {
+    transition: transform .35s ease-in-out;
+}
+
+/* ── блок доп. настроек ─────────────────── */
+.advanced {
+    padding: 0.5rem;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height .6s cubic-bezier(.4, 0, .2, 1);
+}
+
+.advanced.open {
+    padding: 0.5rem;
+    max-height: 350px;
+}
+
+.slider-wrap {
+    margin: 0.8rem 0;
+}
+
+.slider-wrap label {
+    display: flex;
+    justify-content: space-between;
+    font-size: .9rem;
+    margin-bottom: .3rem;
+}
+
+input[type=range] {
+    width: 100%;
+}
+
+/* ── текстовые поля ─────────────────────── */
+input[type=text] {
+    width: 100%;
+    padding: 0.8rem;
+    border: none;
+    border-radius: 1rem;
+    margin-bottom: 0.8rem;
+    background: var(--bg);
+    color: var(--accent);
+    box-shadow: inset -6px -6px 12px var(--sh-light),
+        inset 6px 6px 12px var(--sh-dark);
+}
+
+.small {
+    font-size: .8rem;
+    opacity: .8;
+}
+
+.result {
+    text-align: center;
+    margin-top: 1rem;
+}
+
+.result a {
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: none;
+}
