@@ -1,116 +1,64 @@
-# Roundify‑Web
+# Roundify-Web
 
-**Roundify‑Web** is a lightweight Flask service that converts any video into a circular “video note” ready to be sent to Telegram. Upload a file in your browser, press **Convert**, and download a square MP4 (or let the app post it straight to a chat).
-
----
-
-## Tech Stack
-
-| Layer            | Technology                                    |
-| ---------------- | --------------------------------------------- |
-| Backend          | Python 3 · Flask · Gunicorn                   |
-| Video processing | **FFmpeg** (you must have it in `$PATH`)      |
-| Front‑end        | HTML 5 · vanilla JS · CSS                     |
-| Deployment       | Runs on Linux/macOS/Windows · Docker‑friendly |
+**Roundify-Web** is a lightweight Flask service that turns any video into a Telegram-style circular *video note*.
+Upload a clip in your browser, press **Convert**, and download a square MP4—or let the app post it straight to a chat.
 
 ---
 
-## Installation (local)
+## Tech stack
 
-1. **Prerequisite:** FFmpeg in `$PATH` (`ffmpeg -version`).
-2. Clone the repo and move into it:
-
-   ```
-   git clone https://github.com/<you>/roundify-video-bot.git
-   cd roundify-video-bot
-   ```
-3. Install Python deps (they will auto‑install on first run, but explicit is clearer):
-
-   ```
-   python -m pip install -r requirements.txt
-   ```
-4. Run the server:
-
-   * **Development:** `python app.py` → [http://localhost:8000](http://localhost:8000)
-   * **Production (local):** `gunicorn -b 0.0.0.0:8000 app:app`
+| Layer            | Technology                                 |
+| ---------------- | ------------------------------------------ |
+| Backend          | Python 3 · Flask · Gunicorn                |
+| Video processing | **FFmpeg** (must be on `$PATH`)            |
+| Front-end        | HTML 5 · vanilla JS · CSS                  |
+| Deploy           | Runs on Linux/macOS/Windows · Docker-ready |
 
 ---
 
-## Configuration
+## Quick install (virtual env)
 
-| Setting                 | Default  | Meaning                                   |
-| ----------------------- | -------- | ----------------------------------------- |
-| `-j <N>` / `--jobs <N>` | `1`      | Max parallel conversions (1 – 6)          |
-| `ROUNDIFY_JOBS` (env)   | —        | Same as above; CLI flag overrides env‑var |
-| `FFMPEG` (env)          | `ffmpeg` | Path to the FFmpeg binary                 |
-| `PORT` (env)            | `8000`   | Port for `python app.py`                  |
+```bash
+# system prerequisites
+sudo apt-get install ffmpeg python3-venv
 
-Example:
+# project
+git clone https://github.com/yourname/roundify-video-bot.git
+cd roundify-video-bot
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
-```
-python app.py --jobs 3
-# or
-ROUNDIFY_JOBS=3 FFMPEG=/usr/local/bin/ffmpeg gunicorn -b 0.0.0.0:8000 app:app
+# run (1 job, 60-second TTL)
+python app.py
 ```
 
----
-
-## Usage
-
-1. Open the server URL.
-2. Select a video (any format FFmpeg understands).
-3. Optionally set
-
-   * *diameter* (240 – 1024 px);
-   * *duration* (1 – 60 s) and *offset*;
-   * *Bot Token* and *Chat ID* if you want the video note sent automatically.
-4. Click **Convert**. After processing a **Download** link appears — the file is saved as
-   `<original_name>_round.mp4`.
-
----
-
-## Where files live
-
-During processing, the app creates a folder `roundify_web` inside the system temp directory:
+*Systemd sample* (`/etc/systemd/system/roundify.service`):
 
 ```
-/tmp/roundify_web/           # Linux & macOS
-%TEMP%\roundify_web\         # Windows
+[Unit]
+Description=Roundify Web
+After=network.target
+
+[Service]
+User=roundify
+WorkingDirectory=/opt/roundify
+ExecStart=/opt/roundify/venv/bin/gunicorn \
+          -b 0.0.0.0:8000 app:app \
+          --worker-tmp-dir /dev/shm
+Environment=ROUNDIFY_JOBS=2
+Environment=TTL_SECONDS=45
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-| File                     | Lifecycle                                                    |
-| ------------------------ | ------------------------------------------------------------ |
-| `in_<uuid>` (raw upload) | Deleted immediately after conversion                         |
-| `<uuid>_round.mp4`       | Kept until the user downloads it **or** the OS purges `/tmp` |
-
-If *Bot Token* & *Chat ID* are supplied, the finished video is also posted via
-Telegram Bot API (`sendVideoNote`) before it is offered for download.
-
 ---
 
-## Mini‑API
+## Or run in Docker
 
-| Method | URL                    | Purpose                             |
-| ------ | ---------------------- | ----------------------------------- |
-| `GET`  | `/`                    | Upload form                         |
-| `POST` | `/api/convert`         | Accepts file & params, returns JSON |
-| `GET`  | `/download/<filename>` | Serves the converted MP4            |
-| `GET`  | `/ping`                | Health‑check (`pong`)               |
-
----
-
-## Scaling: job semaphore
-
-Roundify‑Web enforces a **job semaphore** implemented by lock files.
-Set `--jobs`/`ROUNDIFY_JOBS` to 1…6; if all slots are busy the server replies **HTTP 429**.
-
----
-
-## Production Deployment Options
-
-### 1 · Docker (recommended — avoids polluting the host)
-
-**Dockerfile (multi‑stage):**
+Create `Dockerfile` in the repo root:
 
 ```Dockerfile
 FROM python:3.12-slim AS build
@@ -124,63 +72,78 @@ RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /usr/local/lib/python*/site-packages /usr/local/lib/python*/site-packages
 COPY . .
-EXPOSE 8000
 ENV ROUNDIFY_JOBS=3
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "app:app"]
+ENV TTL_SECONDS=60
+EXPOSE 8000
+CMD ["gunicorn", "-b", "0.0.0.0:8000", "app:app", "--worker-tmp-dir", "/dev/shm"]
 ```
 
 Build & run:
 
-```
+```bash
 docker build -t roundify-web .
 docker run -d --name roundify \
            -p 8000:8000 \
            -e ROUNDIFY_JOBS=3 \
+           -e TTL_SECONDS=45 \
            roundify-web
 ```
 
-*Pros:* totally self‑contained; upgrade/rollback is one `docker pull`.
-*Cons:* need Docker daemon (≈ 100 MB extra disk).
+Add Nginx (or Caddy, Traefik) in front for HTTPS; proxy → `roundify:8000`, set `client_max_body_size` as needed.
 
 ---
 
-### 2 · Systemd service inside a Python **virtual env**
+## Configuration
 
-1. Create a dedicated system user, e.g. `roundify`.
+| Option (CLI)   | Env-var         | Range / default      | Meaning                                                |
+| -------------- | --------------- | -------------------- | ------------------------------------------------------ |
+| `-j, --jobs`   | `ROUNDIFY_JOBS` | **1-6** · *1*        | Parallel conversions (semaphore)                       |
+| `-e, --expire` | `TTL_SECONDS`   | **1-300** s · *60* s | How long the finished MP4 is kept before auto-deletion |
+| —              | `FFMPEG`        | path                 | FFmpeg binary if not in `$PATH`                        |
+| —              | `PORT`          | 8000                 | Port for `python app.py`                               |
 
-2. Place project in `/opt/roundify-web`.
+Examples:
 
-3. Create venv:
+```bash
+# 2 jobs, each result auto-removed after 90 s
+python app.py -j 2 -e 90
 
-   ```
-   python3 -m venv /opt/roundify-web/venv
-   /opt/roundify-web/venv/bin/pip install -r /opt/roundify-web/requirements.txt
-   ```
+# same inside Docker / systemd
+ROUNDIFY_JOBS=2 TTL_SECONDS=90 gunicorn -b 0.0.0.0:8000 app:app
+```
 
-4. Install FFmpeg via package manager (`apt install ffmpeg`).
+---
 
-5. **systemd unit** (`/etc/systemd/system/roundify.service`):
+## How it works
 
-   ```
-   [Unit]
-   Description=Roundify‑Web video‑note converter
-   After=network.target
+* **Semaphore** — only *JOBS* conversions run in parallel; extras get **HTTP 429**.
+* **Auto-cleanup** — every output file is scheduled for deletion after *TTL* seconds;
+  a countdown appears on the page.
+* **Telegram mode** — if *Bot Token* + *Chat ID* are provided, the video note is sent
+  first, then kept locally for *TTL* seconds in case you still want to download it.
 
-   [Service]
-   User=roundify
-   WorkingDirectory=/opt/roundify-web
-   Environment=ROUNDIFY_JOBS=2
-   ExecStart=/opt/roundify-web/venv/bin/gunicorn -b 0.0.0.0:8000 app:app
-   Restart=on-failure
+---
 
-   [Install]
-   WantedBy=multi-user.target
-   ```
+## Usage
 
-6. `sudo systemctl daemon-reload && sudo systemctl enable --now roundify.service`.
+1. Open the server URL.
+2. Pick a video; set diameter, duration/offset if desired.
+3. Optionally fill **Bot Token** & **Chat ID**.
+4. Press **Convert**. After processing you’ll see:
 
-*Pros:* no global Python packages; minimal footprint.
-*Cons:* host still needs FFmpeg package; manual updates (`git pull && pip install`).
+   * a **Download** link, plus a live timer (file removed at 0 s);
+   * or “Sent to Telegram” (same timer, file auto-deleted).
+
+---
+
+## Mini API
+
+| Method | URL                    | Purpose                            |
+| ------ | ---------------------- | ---------------------------------- |
+| GET    | `/`                    | Upload form                        |
+| POST   | `/api/convert`         | Accepts video; returns JSON        |
+| GET    | `/download/<filename>` | Serves the MP4 (until TTL expires) |
+| GET    | `/ping`                | Health-check (`pong`)              |
 
 ---
 

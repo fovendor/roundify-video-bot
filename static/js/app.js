@@ -1,5 +1,7 @@
+/* mini‑$ selector */
 const $ = s => document.querySelector(s);
 
+/* DOM references */
 const fileInp = $("#file"),
       fileLbl = $("#fileLabel"),
       chevBtn = $("#chevron"),
@@ -7,27 +9,46 @@ const fileInp = $("#file"),
       convert = $("#convert"),
       status  = $("#status");
 
-/* имя выбранного файла */
+/* filename preview */
 fileInp.addEventListener("change", () =>
   fileLbl.textContent = fileInp.files[0]?.name || "Выберите видео…"
 );
 
-/* раскрыть/свернуть параметры */
+/* show / hide advanced block */
 chevBtn.addEventListener("click", () => {
   chevBtn.classList.toggle("open");
   advBlk .classList.toggle("open");
 });
 
-/* range → output */
-const bindRange = (inpId, outId) => {
-  const i=$(inpId), o=$(outId);
+/* range‑output binding */
+const bindRange = (inp, out) => {
+  const i=$(inp), o=$(out);
   i.addEventListener("input", () => o.textContent = i.value);
 };
-bindRange("#size",   "#sizeOut");
+bindRange("#size",    "#sizeOut");
 bindRange("#duration","#durOut");
-bindRange("#offset", "#offOut");
+bindRange("#offset",  "#offOut");
 
-/* отправка */
+/* countdown */
+function startCountdown(sec){
+  const ttl = document.createElement("span");
+  ttl.id = "ttl";
+  ttl.textContent = ` ⏳ ${sec}s`;
+  status.appendChild(ttl);
+
+  const t = setInterval(()=>{
+    sec--;
+    if(sec<=0){
+      clearInterval(t);
+      ttl.textContent = " 🗑 deleted";
+      $("#dl-btn")?.remove();
+    }else{
+      ttl.textContent = ` ⏳ ${sec}s`;
+    }
+  },1000);
+}
+
+/* convert handler */
 convert.addEventListener("click", async () => {
   if(!fileInp.files[0]){
     status.textContent = "Сначала выберите файл."; return;
@@ -47,9 +68,18 @@ convert.addEventListener("click", async () => {
     const j = await r.json();
     if(!r.ok) throw new Error(j.error || r.statusText);
 
-    let msg = j.sent ? "Отправлено в Telegram." : "Готово.";
-    msg += ` <a href="${j.download}"> Cкачать</a>`;
-    status.innerHTML = msg;
+    status.innerHTML = j.sent
+      ? "Отправлено в Telegram. "
+      : "Готово. ";
+
+    const link = document.createElement("a");
+    link.href = j.download;
+    link.id   = "dl-btn";
+    link.textContent = "Скачать";
+    status.appendChild(link);
+
+    if(j.expires_in) startCountdown(j.expires_in);
+
   }catch(e){
     status.textContent = "⚠️ " + e.message;
   }
