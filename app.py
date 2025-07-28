@@ -163,6 +163,14 @@ def api_convert():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(
+        app.static_folder,     # = "static"
+        "favicon.ico",
+        mimetype="image/vnd.microsoft.icon",
+    )
+
 @app.route("/download/<path:filename>")
 def download(filename):
     return send_from_directory(TMP_DIR, filename, as_attachment=True)
