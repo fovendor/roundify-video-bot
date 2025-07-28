@@ -1,81 +1,65 @@
-# Roundify-Web
+# Roundify‑Web
 
-**Roundify-Web** is a lightweight Flask service that turns any video into a Telegram-style circular *video note*.
-Upload a clip in your browser, press **Convert**, and download a square MP4—or let the app post it straight to a chat.
-
----
-
-## Tech stack
-
-| Layer            | Technology                                 |
-| ---------------- | ------------------------------------------ |
-| Backend          | Python 3 · Flask · Gunicorn                |
-| Video processing | **FFmpeg** (must be on `$PATH`)            |
-| Front-end        | HTML 5 · vanilla JS · CSS                  |
-| Deploy           | Runs on Linux/macOS/Windows · Docker-ready |
+**Roundify‑Web** is a small Flask service that turns any video into a Telegram‑style circular *video note*.
+Upload a file in your browser, hit **Convert**, and download the square MP4 — or have the app send it straight to a chat.
 
 ---
 
-## Quick install (virtual env)
+## Features
+
+* ⭕  Auto‑crop to a perfect circle (square frame, aspect‑correct).
+* ⚙️  Adjustable diameter (240–1024 px), clip length, and start offset.
+* 🤖  Optional **Bot Token** + **Chat ID** → posts result to Telegram.
+* ⏳  Each result is kept for *TTL* seconds (default 60 s) and then auto‑deleted; a countdown is shown on the page.
+* 🔒  Semaphore limits the number of simultaneous conversions (default 1, configurable 1‑6).
+* 🧩  Simple REST mini‑API (`/api/convert`, `/download/<file>`, `/ping`).
+
+---
+
+## Quick Local Run (without Docker)
 
 ```bash
-# system prerequisites
-sudo apt-get install ffmpeg python3-venv
+# prerequisites
+sudo apt‑get install ffmpeg python3‑venv
 
-# project
+# clone & install
 git clone https://github.com/yourname/roundify-video-bot.git
 cd roundify-video-bot
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
-# run (1 job, 60-second TTL)
-python app.py
+# run: 2 parallel jobs, each result kept 90 s
+python app.py -j 2 -e 90
+#   or production‑style
+gunicorn -b 0.0.0.0:8000 app:app --worker-tmp-dir /dev/shm
 ```
 
-*Systemd sample* (`/etc/systemd/system/roundify.service`):
-
-```
-[Unit]
-Description=Roundify Web
-After=network.target
-
-[Service]
-User=roundify
-WorkingDirectory=/opt/roundify
-ExecStart=/opt/roundify/venv/bin/gunicorn \
-          -b 0.0.0.0:8000 app:app \
-          --worker-tmp-dir /dev/shm
-Environment=ROUNDIFY_JOBS=2
-Environment=TTL_SECONDS=45
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
+Open [http://localhost:8000](http://localhost:8000) in your browser.
 
 ---
 
-## Or run in Docker
+## Docker Deployment (recommended)
 
-Create `Dockerfile` in the repo root:
+**Dockerfile** (place in repo root):
 
-```Dockerfile
+```
+### build
 FROM python:3.12-slim AS build
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+### runtime
 FROM python:3.12-slim
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY --from=build /usr/local/lib/python*/site-packages /usr/local/lib/python*/site-packages
+COPY --from=build /usr/local /usr/local
 COPY . .
 ENV ROUNDIFY_JOBS=3
 ENV TTL_SECONDS=60
 EXPOSE 8000
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "app:app", "--worker-tmp-dir", "/dev/shm"]
+CMD ["gunicorn","-b","0.0.0.0:8000","app:app","--worker-tmp-dir","/dev/shm"]
 ```
 
 Build & run:
@@ -83,70 +67,91 @@ Build & run:
 ```bash
 docker build -t roundify-web .
 docker run -d --name roundify \
-           -p 8000:8000 \
-           -e ROUNDIFY_JOBS=3 \
-           -e TTL_SECONDS=45 \
-           roundify-web
+  -p 127.0.0.1:8000:8000 \
+  -e ROUNDIFY_JOBS=2 \
+  -e TTL_SECONDS=90 \
+  --restart unless-stopped \
+  roundify-web
+curl http://127.0.0.1:8000/ping   # → pong
 ```
-
-Add Nginx (or Caddy, Traefik) in front for HTTPS; proxy → `roundify:8000`, set `client_max_body_size` as needed.
 
 ---
 
-## Configuration
-
-| Option (CLI)   | Env-var         | Range / default      | Meaning                                                |
-| -------------- | --------------- | -------------------- | ------------------------------------------------------ |
-| `-j, --jobs`   | `ROUNDIFY_JOBS` | **1-6** · *1*        | Parallel conversions (semaphore)                       |
-| `-e, --expire` | `TTL_SECONDS`   | **1-300** s · *60* s | How long the finished MP4 is kept before auto-deletion |
-| —              | `FFMPEG`        | path                 | FFmpeg binary if not in `$PATH`                        |
-| —              | `PORT`          | 8000                 | Port for `python app.py`                               |
-
-Examples:
+## Production Behind NGINX + HTTPS
 
 ```bash
-# 2 jobs, each result auto-removed after 90 s
-python app.py -j 2 -e 90
-
-# same inside Docker / systemd
-ROUNDIFY_JOBS=2 TTL_SECONDS=90 gunicorn -b 0.0.0.0:8000 app:app
+sudo apt-get install nginx python3-certbot-nginx
 ```
 
+Basic config `/etc/nginx/sites-available/roundify`:
+
+```
+server {
+    listen 80;
+    server_name example.com;
+    client_max_body_size 200M;
+
+    location / {
+        proxy_pass         http://127.0.0.1:8000;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_buffering    off;
+    }
+}
+```
+
+Enable and reload nginx:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/roundify /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Enable HTTPS:
+
+```bash
+sudo certbot --nginx -d example.com
+```
+
+Now open [https://example.com](https://example.com) to access the service securely.
+
 ---
 
-## How it works
+## Configuration Flags / Variables
 
-* **Semaphore** — only *JOBS* conversions run in parallel; extras get **HTTP 429**.
-* **Auto-cleanup** — every output file is scheduled for deletion after *TTL* seconds;
-  a countdown appears on the page.
-* **Telegram mode** — if *Bot Token* + *Chat ID* are provided, the video note is sent
-  first, then kept locally for *TTL* seconds in case you still want to download it.
-
----
-
-## Usage
-
-1. Open the server URL.
-2. Pick a video; set diameter, duration/offset if desired.
-3. Optionally fill **Bot Token** & **Chat ID**.
-4. Press **Convert**. After processing you’ll see:
-
-   * a **Download** link, plus a live timer (file removed at 0 s);
-   * or “Sent to Telegram” (same timer, file auto-deleted).
+* `-j`, `--jobs` / `ROUNDIFY_JOBS`: number of parallel conversions (1–6, default 1)
+* `-e`, `--expire` / `TTL_SECONDS`: time to keep each result (1–300 s, default 60)
+* `FFMPEG`: custom path to `ffmpeg` binary
+* `PORT`: port for `python app.py` (for local use)
 
 ---
 
-## Mini API
+## API Endpoints
 
-| Method | URL                    | Purpose                            |
-| ------ | ---------------------- | ---------------------------------- |
-| GET    | `/`                    | Upload form                        |
-| POST   | `/api/convert`         | Accepts video; returns JSON        |
-| GET    | `/download/<filename>` | Serves the MP4 (until TTL expires) |
-| GET    | `/ping`                | Health-check (`pong`)              |
+* **GET /** – main upload form
+* **POST /api/convert** – accepts video, returns `{download, expires_in, sent}`
+* **GET /download/<filename>** – serves file (until TTL expiry)
+* **GET /ping** – returns `pong`
+
+---
+
+## Updating in Production
+
+```bash
+cd /opt/roundify
+git pull
+docker build -t roundify-web .
+docker stop roundify && docker rm roundify
+docker run -d --name roundify \
+  -p 127.0.0.1:8000:8000 \
+  --restart unless-stopped \
+  roundify-web
+sudo systemctl reload nginx   # only if nginx config changed
+```
 
 ---
 
 ## License
 
-MIT. FFmpeg is distributed under its own LGPL/GPL terms.
+MIT. FFmpeg is provided under its own LGPL/GPL terms.
