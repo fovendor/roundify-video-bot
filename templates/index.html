@@ -1,60 +1,58 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 
 <head>
   <meta charset="utf-8">
-
-  <meta name="viewport"
-    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#d3d3d3">
-
   <title>Roundify</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}?v=1">
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}?v=2">
+  <!-- Socket.IO CDN -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 
 <body>
-
   <main class="card">
     <h1>Roundify</h1>
 
     <label class="upload" for="file">
       <input id="file" type="file" accept="video/*" hidden>
-      <span id="fileLabel">Выберите видео…</span>
+      <span id="fileLabel">Choose video…</span>
     </label>
 
     <button id="convert">Convert</button>
 
-    <button type="button" class="chevron" id="chevron" aria-label="Доп. настройки">
+    <button type="button" class="chevron" id="chevron" aria-label="Advanced">
       <span></span><span></span>
     </button>
 
     <section class="advanced" id="advanced">
       <div class="slider-wrap">
-        <label>Размер (px) <output id="sizeOut">640</output></label>
+        <label>Size (px) <output id="sizeOut">640</output></label>
         <input type="range" id="size" min="240" max="1024" step="16" value="640">
       </div>
 
       <div class="slider-wrap">
-        <label>Длительность (с) <output id="durOut">60</output></label>
+        <label>Duration (s) <output id="durOut">60</output></label>
         <input type="range" id="duration" min="1" max="60" value="60">
       </div>
 
       <div class="slider-wrap">
-        <label>Сдвиг начала видео (с) <output id="offOut">0</output></label>
+        <label>Offset (s) <output id="offOut">0</output></label>
         <input type="range" id="offset" min="0" max="600" value="0">
       </div>
 
       <input type="text" id="token" placeholder="Bot token">
-      <input type="text" id="chat" placeholder="@channel или chat-id">
-      <p class="small">Если заполнить оба поля — видео отправится кружочком в Telegram.</p>
+      <input type="text" id="chat" placeholder="@channel or chat‑id">
+      <p class="small">Fill both fields and the video will be sent to Telegram as a circular note.</p>
     </section>
+
+    <progress id="bar" max="1" value="0"></progress>
+    <span id="pct">0%</span>
 
     <p class="result" id="status"></p>
   </main>
-
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 

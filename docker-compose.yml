@@ -1,0 +1,25 @@
+services:
+  roundify:
+    build: .
+    restart: unless-stopped
+    environment:
+      ROUNDIFY_JOBS: 3        # how many concurrent FFmpeg workers
+      TTL_SECONDS: 90         # result lifetime (download link)
+    ports:
+      - "127.0.0.1:8000:8000" # bind only to localhost (reverse‑proxy later)
+    # optional: mount a host dir for temporary files
+    # volumes:
+    #   - /srv/roundify/tmp:/tmp/roundify_ws
+
+    # ← НОВОЕ: привязываем контейнер к нашей сети
+    networks:
+      roundify_net:
+        # static IP факультативно; можно убрать, если не нужно
+        ipv4_address: 10.77.0.10
+
+networks:
+  roundify_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.77.0.0/24     # любой свободный диапазон, главное ≠ VPN/LAN

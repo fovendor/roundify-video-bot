@@ -6,10 +6,12 @@ const fileInp = $("#file"),
   chevBtn = $("#chevron"),
   advBlk = $("#advanced"),
   convert = $("#convert"),
-  status = $("#status");
+  status = $("#status"),
+  bar = $("#bar"),
+  pctTxt = $("#pct");
 
 fileInp.addEventListener("change", () =>
-  fileLbl.textContent = fileInp.files[0]?.name || "Выберите видео…"
+  fileLbl.textContent = fileInp.files[0]?.name || "Choose video…"
 );
 
 chevBtn.addEventListener("click", () => {
@@ -25,34 +27,22 @@ bindRange("#size", "#sizeOut");
 bindRange("#duration", "#durOut");
 bindRange("#offset", "#offOut");
 
-function startCountdown(sec) {
-  const ttl = document.createElement("span");
-  ttl.id = "ttl";
-  status.append(" ", ttl);
-  const t = setInterval(() => {
-    sec--;
-    ttl.textContent = `⏳ ${sec}s`;
-    if (sec <= 0) {
-      clearInterval(t);
-      ttl.textContent = "🗑 deleted";
-      $("#dl-btn")?.remove();
-    }
-  }, 1000);
-}
+const sio = io();   // Socket.IO client
 
-function showLoader() {
-  status.innerHTML = `<span class="loader"></span>Обработка…`;
+function resetProgress() {
+  bar.value = 0;
+  pctTxt.textContent = "0%";
 }
-function hideLoader() {
-  $(".loader")?.remove();
+function updatePct(v) {
+  bar.value = v;
+  pctTxt.textContent = Math.round(v * 100) + "%";
 }
 
 convert.addEventListener("click", async () => {
-  if (!fileInp.files[0]) {
-    status.textContent = "Сначала выберите файл."; return;
-  }
+  if (!fileInp.files[0]) { status.textContent = "Select a file first."; return; }
 
-  showLoader();
+  status.textContent = "Uploading…";
+  resetProgress();
 
   const fd = new FormData();
   fd.append("video", fileInp.files[0]);
@@ -63,23 +53,35 @@ convert.addEventListener("click", async () => {
   if ($("#chat").value) fd.append("chat", $("#chat").value);
 
   try {
-    const r = await fetch("/api/convert", { method: "POST", body: fd });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || r.statusText);
+    const r = await fetch("/api/upload", { method: "POST", body: fd });
+    const { job_id, error } = await r.json();
+    if (!r.ok) throw new Error(error || r.statusText);
 
-    hideLoader();
-    status.innerHTML = (j.sent ? "Отправлено в Telegram. " : "Готово. ");
+    sio.emit("join", { job: job_id });
 
-    const link = document.createElement("a");
-    link.href = j.download;
-    link.id = "dl-btn";
-    link.textContent = "Скачать";
-    status.appendChild(link);
+    let clipSec = $("#duration").value;
 
-    if (j.expires_in) startCountdown(j.expires_in);
+    sio.on("metadata", d => {
+      if (d.job !== job_id) return;
+      $("#duration").max = Math.ceil(d.duration);
+      clipSec = $("#duration").value;
+    });
+
+    sio.on("progress", d => {
+      if (d.job !== job_id) return;
+      updatePct(d.ms / (clipSec * 1000));
+    });
+
+    sio.on("done", d => {
+      if (d.job !== job_id) return;
+      updatePct(1);
+      status.innerHTML = `Done — <a href="${d.download}">Download</a>`;
+      sio.emit("leave", { job: job_id });
+    });
+
+    status.textContent = "Processing…";
 
   } catch (e) {
-    hideLoader();
     status.textContent = "⚠️ " + e.message;
   }
 });

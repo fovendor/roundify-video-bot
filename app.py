@@ -1,183 +1,142 @@
 #!/usr/bin/env python3
 """
-Roundify‑Web — конвертация видео в кружочки Telegram.
+Roundify-WS — video-to-circle converter with WebSocket progress.
 
-CLI‑параметры
--------------
-  -j, --jobs <1‑6>      —  параллельных конверсий (default 1)
-  -e, --expire <1‑300>  —  секунд хранить результат (default 60)
+*   HTTP  POST /api/upload   → {job_id}
+*   WS   /socket.io          → events: metadata, progress, done
+*   GET  /download/<file>    → result mp4
 
-Параметры окружения (используются, если нет CLI‑флага):
-  ROUNDIFY_JOBS     —   то же, что -j
-  TTL_SECONDS       —   то же, что -e
-  FFMPEG            —   путь к ffmpeg
-  PORT              —   порт для `python app.py`
+Config via env:
+  ROUNDIFY_JOBS   — workers in ProcessPoolExecutor   (default 2)
+  TTL_SECONDS     — result life-time before delete   (default 60)
+  PORT            — Flask port (dev)                 (default 8000)
+  GUNICORN_CMD_ARGS is set in Dockerfile for prod.
 """
 from __future__ import annotations
-import argparse, importlib.util, os, platform, subprocess, sys, tempfile, threading, uuid
-from contextlib import contextmanager
-from pathlib import Path
-from typing import List
+import json, os, subprocess, tempfile, uuid, pathlib as pl
+from concurrent.futures import ProcessPoolExecutor
+from flask import (Flask, jsonify, request, send_from_directory,
+                   url_for, render_template)
+from flask_socketio import SocketIO, emit, join_room, leave_room
 
-# ─────────────────── автоустановка зависимостей ──────────────────────────────
-BASE = Path(__file__).resolve().parent
-REQ  = BASE / "requirements.txt"
-for mod in ("flask", "requests"):
-    if importlib.util.find_spec(mod) is None:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(REQ)])
+# ───────────────────────────── settings ──────────────────────────────────────
+WORKERS      = int(os.getenv("ROUNDIFY_JOBS", 2))
+TTL_SECONDS  = int(os.getenv("TTL_SECONDS", 60))
+TMP          = pl.Path(tempfile.gettempdir()) / "roundify_ws"
+TMP.mkdir(exist_ok=True)
 
-# ─────────────────────────── CLI / ENV чтение ────────────────────────────────
-def _parse_cli() -> tuple[int, int]:
-    p = argparse.ArgumentParser(add_help=False)
-    p.add_argument("-j", "--jobs",   type=int, help="parallel conversions (1‑6)")
-    p.add_argument("-e", "--expire", type=int, help="seconds to keep result (1‑300)")
-    ns, _ = p.parse_known_args()
+# ─────────────────────────── Flask / SocketIO ────────────────────────────────
+app     = Flask(__name__, static_folder="static", template_folder="templates")
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-    jobs   = ns.jobs   or int(os.getenv("ROUNDIFY_JOBS", 1))
-    expire = ns.expire or int(os.getenv("TTL_SECONDS",   60))
-    jobs   = max(1, min(6, jobs))
-    expire = max(1, min(300, expire))
-    return jobs, expire
+EXECUTOR = ProcessPoolExecutor(max_workers=WORKERS)
 
-MAX_JOBS, TTL_SECONDS = _parse_cli()
+# ─────────────────────────── helpers ─────────────────────────────────────────
+def ffprobe_meta(path: pl.Path) -> dict:
+    """Return duration, width, height via ffprobe (≈30 ms)."""
+    cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0",
+           "-show_entries", "stream=width,height",
+           "-show_entries", "format=duration",
+           "-print_format", "json", str(path)]
+    meta = json.loads(subprocess.check_output(cmd))
+    return {
+        "duration": float(meta["format"]["duration"]),
+        "width":    int(meta["streams"][0]["width"]),
+        "height":   int(meta["streams"][0]["height"])
+    }
 
-# ───────────────────────────── Flask импорты ─────────────────────────────────
-from flask import (Flask, jsonify, render_template, request,
-                   send_from_directory, url_for)                              # type: ignore
-import requests                                                               # type: ignore
+def calc_video_bitrate(max_mb: int, clip_sec: int,
+                       audio_kbps: int = 128) -> int:
+    """
+    Return required video bitrate (kbit/s) to keep file ≤ max_mb.
+    VB =  (MaxMiB * 8 * 1024) / seconds  –  AB
+                                             ↓
+                         audio bitrate (kbit/s)
+    """
+    total_kbps = max_mb * 8192 // clip_sec
+    return max(200, total_kbps - audio_kbps)        # min 200 kbps
 
-# ──────────────────────────────── FS и FFmpeg ────────────────────────────────
-FFMPEG   = os.getenv("FFMPEG", "ffmpeg")
-TMP_DIR  = Path(tempfile.gettempdir()) / "roundify_web"
-SLOT_DIR = TMP_DIR / "slots"
-for d in (TMP_DIR, SLOT_DIR): d.mkdir(exist_ok=True)
+def run_ffmpeg(job_id: str, src: str, opts: dict):
+    """Executed in worker process; emits WS events via SocketIO server."""
+    src = pl.Path(src)
+    meta = ffprobe_meta(src)
+    socketio.emit("metadata", {**meta, "job": job_id}, to=job_id)
 
-# ─────────────── файловый семафор (MAX_JOBS параллельно) ─────────────────────
-if platform.system() == "Windows":
-    if importlib.util.find_spec("portalocker") is None:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "portalocker>=2"])
-    import portalocker                             # type: ignore
-    @contextmanager
-    def _lock(path: Path):
-        with portalocker.Lock(str(path),
-                              flags=portalocker.LOCK_EX | portalocker.LOCK_NB):
-            yield
-else:
-    import fcntl
-    @contextmanager
-    def _lock(path: Path):
-        path.touch(exist_ok=True)
-        with path.open("r+") as fh:
-            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            try:    yield
-            finally: fcntl.flock(fh, fcntl.LOCK_UN)
+    vb = calc_video_bitrate(opts["max_mb"], opts["clip_sec"])
+    dst = TMP / f"{src.stem}_round.mp4"
+    vf  = (f"crop='min(iw\\,ih)':min(iw\\,ih),setsar=1,"
+           f"scale={opts['size']}:{opts['size']}")
 
-class Busy(Exception): ...
-
-@contextmanager
-def acquire_slot():
-    for i in range(MAX_JOBS):
-        try:
-            with _lock(SLOT_DIR / f"slot{i}.lock"):
-                yield; return
-        except Exception:
-            continue
-    raise Busy
-
-# ───────────────────────────── утилиты ───────────────────────────────────────
-def _run(cmd: List[str]) -> None:
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode:
-        raise RuntimeError(r.stderr or r.stdout)
-
-def _convert(src: Path, dst: Path, size: int, dur: int, off: int) -> None:
-    vf = f"crop='min(iw\\,ih)':min(iw\\,ih),setsar=1,scale={size}:{size}"
-    cmd = [FFMPEG, "-y", "-ss", str(off), "-i", str(src), "-t", str(dur),
+    cmd = ["ffmpeg", "-y",
+           "-ss", str(opts["offset"]),
+           "-t",  str(opts["clip_sec"]),
+           "-i",  str(src),
            "-vf", vf,
-           "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.0",
-           "-preset", "veryfast", "-crf", "23",
+           "-c:v", "libx264", "-b:v", f"{vb}k",
            "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-           "-c:a", "aac", "-b:a", "128k", str(dst)]
-    _run(cmd)
+           "-c:a", "aac", "-b:a", "128k",
+           "-progress", "pipe:1", "-f", "mp4", str(dst)]
 
-def _send_note(tok: str, chat: str, video: Path, length: int) -> None:
-    url = f"https://api.telegram.org/bot{tok}/sendVideoNote"
-    with video.open("rb") as f:
-        r = requests.post(url, data={"chat_id": chat, "length": length},
-                          files={"video_note": f}, timeout=45)
-    if not r.ok:
-        raise RuntimeError(r.text)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, text=True)
 
-def _schedule_delete(path: Path, delay: int = TTL_SECONDS) -> None:
-    t = threading.Timer(delay, path.unlink, kwargs={"missing_ok": True})
-    t.daemon = True
-    t.start()
+    for line in proc.stdout:
+        if line.startswith("out_time_ms"):
+            ms = int(line.split("=")[1])
+            socketio.emit("progress",
+                          {"job": job_id, "ms": ms},
+                          to=job_id)
+        elif line.strip() == "progress=end":
+            break
+    proc.wait()
 
-# ──────────────────────────── Flask app ──────────────────────────────────────
-app = Flask(__name__, template_folder="templates", static_folder="static")
+    socketio.emit("done",
+                  {"job": job_id,
+                   "download": url_for("download",
+                                       filename=dst.name,
+                                       _external=True)},
+                  to=job_id)
+    src.unlink(missing_ok=True)  # clean input
 
+# ─────────────────────────── routes ──────────────────────────────────────────
 @app.route("/")
-def index():
-    return render_template("index.html")
+def index(): return render_template("index.html")
 
-@app.route("/api/convert", methods=["POST"])
-def api_convert():
-    try:
-        with acquire_slot():
-            up = request.files.get("video")
-            if not up:
-                return jsonify(error="file not selected"), 400
+@app.post("/api/upload")
+def api_upload():
+    up = request.files.get("video")
+    if not up:
+        return jsonify(error="file field missing"), 400
 
-            size = int(request.form.get("size", 640))
-            dur  = int(request.form.get("duration", 60))
-            off  = int(request.form.get("offset", 0))
+    job_id = uuid.uuid4().hex
+    tmp_in = TMP / f"in_{job_id}"
+    up.save(tmp_in)
 
-            src = TMP_DIR / f"in_{uuid.uuid4().hex}"
-            up.save(src)
-            out = TMP_DIR / f"{src.stem}_round.mp4"
-
-            try:
-                _convert(src, out, size, dur, off)
-            finally:
-                src.unlink(missing_ok=True)
-
-            tok, chat = request.form.get("token"), request.form.get("chat")
-            if tok and chat:                             # Telegram‑режим
-                try:
-                    _send_note(tok, chat, out, length=size)
-                except Exception as e:
-                    out.unlink(missing_ok=True)
-                    return jsonify(error=str(e)), 500
-                _schedule_delete(out)                    # держим TTL для скачивания
-                return jsonify(download=url_for('download', filename=out.name),
-                               expires_in=TTL_SECONDS,
-                               sent=True)
-
-            _schedule_delete(out)                        # обычный сценарий
-            return jsonify(download=url_for('download', filename=out.name),
-                           expires_in=TTL_SECONDS,
-                           sent=False)
-
-    except Busy:
-        return jsonify(error="Server busy, try again later"), 429
-    except Exception as e:
-        return jsonify(error=str(e)), 500
-
-@app.route("/favicon.ico")
-def favicon():
-    return send_from_directory(
-        app.static_folder,     # = "static"
-        "favicon.ico",
-        mimetype="image/vnd.microsoft.icon",
+    opts = dict(
+        size      = int(request.form.get("size", 640)),
+        offset    = int(request.form.get("offset", 0)),
+        clip_sec  = int(request.form.get("duration", 60)),
+        max_mb    = 48 if request.form.get("token") and request.form.get("chat")
+                         else 100
     )
+    EXECUTOR.submit(run_ffmpeg, job_id, str(tmp_in), opts)
+    return jsonify(job_id=job_id)
 
-@app.route("/download/<path:filename>")
+@socketio.on("join")
+def on_join(data): join_room(data["job"])
+
+@socketio.on("leave")
+def on_leave(data): leave_room(data["job"])
+
+@app.get("/download/<path:filename>")
 def download(filename):
-    return send_from_directory(TMP_DIR, filename, as_attachment=True)
+    return send_from_directory(TMP, filename, as_attachment=True,
+                               max_age=TTL_SECONDS)
 
-@app.route("/ping")
+@app.get("/ping")
 def ping(): return "pong"
 
+# ─────────────────────────── main (dev) ──────────────────────────────────────
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    import eventlet; eventlet.monkey_patch()
+    socketio.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))

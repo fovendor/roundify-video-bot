@@ -1,97 +1,90 @@
-# Roundify‑Web
+# Roundify
 
-**Roundify‑Web** is a small Flask service that turns any video into a Telegram‑style circular *video note*.
-Upload a file in your browser, hit **Convert**, and download the square MP4 — or have the app send it straight to a chat.
+**Roundify** converts any video into a circular *Telegram Video Note* with real‑time progress delivered over a WebSocket channel.
 
-👉 **Try it online:** [https://roundify.ether-memory.com](https://roundify.ether-memory.com)
+▶ **Live demo:** [https://roundify.ether-memory.com](https://roundify.ether-memory.com)
 
 ---
 
 ## Features
 
-* ⭕  Auto‑crop to a perfect circle (square frame, aspect‑correct).
-* ⚙️  Adjustable diameter (240–1024 px), clip length, and start offset.
-* 🤖  Optional **Bot Token** + **Chat ID** → posts result to Telegram.
-* ⏳  Each result is kept for *TTL* seconds (default 60 s) and then auto‑deleted; a countdown is shown on the page.
-* 🔒  Semaphore limits the number of simultaneous conversions (default 1, configurable 1‑6).
-* 🧩  Simple REST mini‑API (`/api/convert`, `/download/<file>`, `/ping`).
+- ⭕ Perfect crop + square resize (240‑1024 px).
+  
+- 🎚 Adjustable clip length and start offset.
+  
+- 🌐 WebSocket progress bar – see the percentage while FFmpeg works.
+  
+- 🤖 Optional **Bot Token** & **Chat ID** – post straight to Telegram (auto‑fits ≤ 50 MB).
+  
+- ⏳ Auto‑cleanup: each result lives **TTL** seconds (default 60).
+  
+- 🏗 Parallel conversions (configurable, default 2).
 
----
-
-## Quick Local Run (without Docker)
+## Quick Start (Local)
 
 ```bash
-# prerequisites
-sudo apt‑get install ffmpeg python3‑venv
-
-# clone & install
+sudo apt-get install ffmpeg python3-venv
 git clone https://github.com/yourname/roundify-video-bot.git
 cd roundify-video-bot
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-
-# run: 2 parallel jobs, each result kept 90 s
-python app.py -j 2 -e 90
-#   or production‑style
-gunicorn -b 0.0.0.0:8000 app:app --worker-tmp-dir /dev/shm
+python app.py
+# open http://localhost:8000
 ```
 
-Open [http://localhost:8000](http://localhost:8000) in your browser.
+## Docker Compose (Recommended)
 
----
+### 1. docker-compose.yml
 
-## Docker Deployment (recommended)
+Create *docker-compose.yml* in the root of the repository.
 
-**Dockerfile** (place in repo root):
-
-```
-### build
-FROM python:3.12-slim AS build
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-### runtime
-FROM python:3.12-slim
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY --from=build /usr/local /usr/local
-COPY . .
-ENV ROUNDIFY_JOBS=3
-ENV TTL_SECONDS=60
-EXPOSE 8000
-CMD ["gunicorn","-b","0.0.0.0:8000","app:app","--worker-tmp-dir","/dev/shm"]
+```yaml
+services:
+  roundify:
+    build: .
+    restart: unless-stopped
+    environment:
+      ROUNDIFY_JOBS: 3        # how many concurrent FFmpeg workers
+      TTL_SECONDS: 90         # result lifetime (download link)
+    ports:
+      - "127.0.0.1:8000:8000" # bind only to localhost (reverse‑proxy later)
+    # optional: mount a host dir for temporary files
+    # volumes:
+    #   - /srv/roundify/tmp:/tmp/roundify_ws
 ```
 
-Build & run:
+### 2. Build and launch
 
 ```bash
-docker build -t roundify-web .
-docker run -d --name roundify \
-  -p 127.0.0.1:8000:8000 \
-  -e ROUNDIFY_JOBS=2 \
-  -e TTL_SECONDS=90 \
-  --restart unless-stopped \
-  roundify-web
-curl http://127.0.0.1:8000/ping   # → pong
+docker compose build           # one‑time image build (~100 MB)
+docker compose up -d           # start in background
 ```
 
----
+> First launch pulls the Python base image and compiles wheels – give it a minute.
 
-## Production Behind NGINX + HTTPS
+### 3. Check logs
 
 ```bash
-sudo apt-get install nginx python3-certbot-nginx
+docker compose logs -f roundify
+# Ctrl‑C to exit tail
 ```
 
-Basic config `/etc/nginx/sites-available/roundify`:
+### Upgrade later
 
+```bash
+git pull                           # get new code
+docker compose build --pull        # rebuild image with updates
+docker compose up -d               # zero‑downtime replace
 ```
+
+## Nginx Reverse Proxy (example.com)
+
+Minimal site config (`/etc/nginx/sites-available/roundify`, enable with `ln -s`):
+
+```nginx
 server {
-    listen 80;
-    server_name example.com;
-    client_max_body_size 200M;
+    server_name roundify.example.com;
+    client_max_body_size 600M;
 
     location / {
         proxy_pass         http://127.0.0.1:8000;
@@ -99,61 +92,100 @@ server {
         proxy_set_header   X-Real-IP $remote_addr;
         proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_buffering    off;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
     }
+
+    # SSL managed by certbot; the tool will inject the block below
+    listen 443 ssl;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_certificate     /etc/letsencrypt/live/roundify.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/roundify.example.com/privkey.pem;
 }
 ```
 
-Enable and reload nginx:
+Reload Nginx:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/roundify /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Enable HTTPS:
+Voila — production URL https://roundify.example.com is live.
 
-```bash
-sudo certbot --nginx -d example.com
+## API
+
+| Verb | Path | Notes |
+| --- | --- | --- |
+| GET | `/` | Upload UI |
+| POST | `/api/upload` | multipart `video`, fields… |
+| GET | `/download/<f>` | result while TTL not expired |
+| GET | `/ping` | health‑check → `pong` |
+| WS  | `/socket.io` | events: `metadata`, `progress`, `done` |
+
+## Environment Vars
+
+| Name | Default | Purpose |
+| --- | --- | --- |
+| `ROUNDIFY_JOBS` | `2` | concurrent FFmpeg workers |
+| `TTL_SECONDS` | `60` | how long files stay in `/download/*` |
+| `GUNICORN_CMD_ARGS` | *(set in Dockerfile)* | worker count, timeout, etc. |
+
+## Architecture (see diagram below)
+
+1. Browser uploads file ➜ `/api/upload` (HTTP) – returns `{job_id}` in ~1 s.
+  
+2. Browser opens WebSocket and joins room `job_id`.
+  
+3. Worker process runs FFmpeg and streams progress (`out_time_ms`) back to room.
+  
+4. When finished, server emits `done` with download URL (or sends to Telegram).
+
+```mermaid
+graph LR
+    subgraph Client
+        A[Browser]
+    end
+
+    subgraph Backend
+        B[Flask REST API]
+        C[Socket.IO Gateway]
+        D[ProcessPool Worker]
+        E[FFmpeg]
+    end
+
+    A -- "HTTP POST /api/upload" --> B
+    A -- "WebSocket /socket.io" --> C
+    B -- "put job" --> D
+    D -- "runs FFmpeg\n-progress pipe:1" --> E
+    D -- "emit metadata/\nprogress/done" --> C
+    C -- "push events" --> A
+    B -- "GET /download/(file)" --> A
 ```
 
-Now open [https://example.com](https://example.com) to access the service securely.
+## Tune the Output Size ≤ 50 MB (Telegram)
 
----
+1. The required **video bitrate** is chosen automatically:
 
-## Configuration Flags / Variables
+$$
+VB = \frac{\text{MaxMiB} \times 8 \times 1024}{\text{ClipSec}} - AB
+$$
 
-* `-j`, `--jobs` / `ROUNDIFY_JOBS`: number of parallel conversions (1–6, default 1)
-* `-e`, `--expire` / `TTL_SECONDS`: time to keep each result (1–300 s, default 60)
-* `FFMPEG`: custom path to `ffmpeg` binary
-* `PORT`: port for `python app.py` (for local use)
+    *`AB` – audio bitrate (128 kbps).*
 
----
+    *`VB` is clamped ≥ 200 kbps.*
 
-## API Endpoints
+    `Mmax`​ — is the desired maximum file size (MiB).
 
-* **GET /** – main upload form
-* **POST /api/convert** – accepts video, returns `{download, expires_in, sent}`
-* **GET /download/<filename>** – serves file (until TTL expiry)
-* **GET /ping** – returns `pong`
+    `ClipSec`​ — is the clip duration in seconds.
 
----
+2. **Progress percentage**
 
-## Updating in Production
+$$
+P = \frac{t_{\text{out}}}{T_{\text{clip}}}
+$$
 
-```bash
-cd /opt/roundify
-git pull
-docker build -t roundify-web .
-docker stop roundify && docker rm roundify
-docker run -d --name roundify \
-  -p 127.0.0.1:8000:8000 \
-  --restart unless-stopped \
-  roundify-web
-sudo systemctl reload nginx   # only if nginx config changed
-```
-
----
+where $t_{\text{out}}$ — is the `out_time_ms` $\div 1000$ value from FFmpeg.
 
 ## License
 
-MIT. FFmpeg is provided under its own LGPL/GPL terms.
+MIT. FFmpeg under LGPL/GPL.
