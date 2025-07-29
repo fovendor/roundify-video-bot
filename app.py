@@ -23,6 +23,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 # ─────────────── settings ───────────────
 WORKERS = int(os.getenv("ROUNDIFY_JOBS", 2))
 TTL_SECONDS = int(os.getenv("TTL_SECONDS", 60))
+MAX_CLIP_SECONDS = int(os.getenv("MAX_CLIP_SECONDS", 60)) # Новая настройка
 TMP = pl.Path(tempfile.gettempdir()) / "roundify_ws"
 TMP.mkdir(exist_ok=True)
 
@@ -35,7 +36,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 # ───────────── helpers ──────────────────
 def ffprobe_meta(path: pl.Path) -> Dict[str, Any]:
-    """Быстро вытащить длительность и разрешение видео."""
     cmd = [
         "ffprobe", "-v", "error", "-select_streams", "v:0",
         "-show_entries", "stream=width,height", "-show_entries", "format=duration",
@@ -49,7 +49,6 @@ def ffprobe_meta(path: pl.Path) -> Dict[str, Any]:
     }
 
 def calc_video_bitrate(max_mb: int, clip_sec: float, audio_kbps: int = 128) -> int:
-    """Расчет битрейта видео для достижения целевого размера файла."""
     if clip_sec <= 0:
         clip_sec = 1.0
     total_kbps = int(max_mb * 8192 / clip_sec)
@@ -57,7 +56,6 @@ def calc_video_bitrate(max_mb: int, clip_sec: float, audio_kbps: int = 128) -> i
 
 # ───────── Telegram ──────────
 def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
-    """Отправка видео-кружочка в Telegram."""
     url = f"https://api.telegram.org/bot{token}/sendVideoNote"
     try:
         with path.open("rb") as f:
@@ -71,10 +69,6 @@ def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
 
 # ───────── FFmpeg Background Task ─────
 def run_ffmpeg_and_notify(job_id: str, src_path_str: str, opts: dict):
-    """
-    Выполняется в фоновой eventlet-совместимой задаче.
-    Конвертирует видео, отправляет прогресс и финальный результат.
-    """
     src_path = pl.Path(src_path_str)
     dst_path = TMP / f"{src_path.stem}_round.mp4"
 
@@ -105,8 +99,6 @@ def run_ffmpeg_and_notify(job_id: str, src_path_str: str, opts: dict):
                     socketio.emit("progress", {"job": job_id, "ms": ms}, to=job_id)
                 except (ValueError, IndexError):
                     continue
-            elif line.strip() == "progress=end":
-                break
         proc.wait()
 
         socketio.emit("status_update", {"job": job_id, "status": "Finalizing..."}, to=job_id)
@@ -116,33 +108,31 @@ def run_ffmpeg_and_notify(job_id: str, src_path_str: str, opts: dict):
             if dst_path.exists() and dst_path.stat().st_size > 0:
                 socketio.emit("status_update", {"job": job_id, "status": "Sending to Telegram..."}, to=job_id)
                 tg_ok = send_to_telegram(dst_path, opts["token"], opts["chat"])
-            else:
-                log.error(f"FFmpeg did not produce an output file for job {job_id}")
 
-        # --- ИЗМЕНЕНИЕ ---
-        # Создаем контекст приложения, чтобы url_for() работал в фоновой задаче
+        # ИЗМЕНЕНИЕ: Генерируем относительный URL, убрав _external=True
         with app.app_context():
-            socketio.emit("done", {
-                "job": job_id,
-                "download": url_for('download', filename=dst_path.name, _external=True),
-                "telegram": tg_ok
-            }, to=job_id)
+            download_url = url_for('download', filename=dst_path.name)
+
+        socketio.emit("done", {
+            "job": job_id,
+            "download": download_url,
+            "telegram": tg_ok
+        }, to=job_id)
 
     except Exception as e:
         log.error(f"Error in background task for job {job_id}: {e}")
-        # Отправляем ошибку на фронтенд
         with app.app_context():
             socketio.emit("status_update", {"job": job_id, "status": f"Error: {e}"}, to=job_id)
 
     finally:
-        # Гарантированная очистка исходного файла
         if src_path.exists():
             src_path.unlink()
 
 # ───────────── routes ───────────────────
 @app.route("/")
 def index():
-    return render_template("index.html")
+    # Передаем MAX_CLIP_SECONDS в шаблон
+    return render_template("index.html", max_clip_seconds=MAX_CLIP_SECONDS)
 
 @app.post("/api/upload")
 def api_upload():
@@ -173,6 +163,12 @@ def api_upload():
 @app.post("/api/convert")
 def api_convert():
     job_id = request.form.get("job_id")
+    clip_duration = float(request.form.get("duration", 0))
+
+    # ИЗМЕНЕНИЕ: Проверка на максимальную длительность
+    if clip_duration > MAX_CLIP_SECONDS:
+        return jsonify(error=f"Duration cannot exceed {MAX_CLIP_SECONDS} seconds."), 400
+
     if not job_id:
         return jsonify(error="job_id missing"), 400
 
@@ -185,7 +181,7 @@ def api_convert():
     opts = {
         "size": int(request.form.get("size", 640)),
         "offset": float(request.form.get("offset", 0)),
-        "clip_sec": float(request.form.get("duration", 60)),
+        "clip_sec": clip_duration,
         "max_mb": 8 if is_for_telegram else 100,
         "token": request.form.get("token"),
         "chat": request.form.get("chat"),
@@ -215,17 +211,13 @@ def download(filename):
 def ping():
     return "pong"
 
-# ────── background TTL janitor ──────
 def janitor():
-    """Фоновый чистильщик старых файлов."""
     while True:
         now = time.time()
         try:
             for p in TMP.iterdir():
                 if p.is_file() and p.stat().st_mtime < now - TTL_SECONDS:
                     p.unlink(missing_ok=True)
-        except FileNotFoundError:
-            pass
         except Exception as e:
             log.error(f"Janitor error: {e}")
         time.sleep(max(TTL_SECONDS, 60))

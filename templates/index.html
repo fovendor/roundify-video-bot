@@ -34,7 +34,8 @@
 
       <div class="slider-wrap">
         <label>Duration (s) <output id="durOut">60</output></label>
-        <input type="range" id="duration" min="1" max="60" value="60">
+        <!-- ИЗМЕНЕНИЕ: max устанавливается с бэкенда -->
+        <input type="range" id="duration" min="1" max="{{ max_clip_seconds }}" value="{{ max_clip_seconds }}">
       </div>
 
       <div class="slider-wrap">
