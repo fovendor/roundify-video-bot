@@ -2,8 +2,6 @@
 
 const fileInp = $("#file"),
   fileLbl = $("#fileLabel"),
-  fileLblProgress = $("#fileLabelProgress"),
-  progressTextContainer = $(".progress-text-container"),
   progressBarFill = $("#progressBarFill"),
   uploadLabel = $("#uploadLabel"),
   chevBtn = $("#chevron"), advBlk = $("#advanced"), convertBtn = $("#convert"),
@@ -176,9 +174,8 @@ function resetUI() {
   convertBtn.disabled = true;
   fileInp.value = '';
   fileLbl.textContent = 'Choose video…';
+  fileLbl.style.backgroundPosition = '100% 0'; // Сбрасываем градиент
   progressBarFill.style.width = '0%';
-  progressTextContainer.style.width = '0%';
-  fileLblProgress.textContent = '';
   status.textContent = '';
   if (statusTimer) clearInterval(statusTimer);
 }
@@ -186,18 +183,19 @@ function resetUI() {
 function resetProgress() {
   const initialText = '0%';
   fileLbl.textContent = initialText;
-  fileLblProgress.textContent = initialText;
+  fileLbl.style.backgroundPosition = '100% 0'; // Сбрасываем градиент
   progressBarFill.style.width = '0%';
-  progressTextContainer.style.width = '0%';
 }
 
 function updateProgress(v) {
-  const pct = Math.min(100, Math.round(v * 100));
-  const pctStr = `${pct}%`;
+  const pct = Math.min(100, v * 100);
+  const pctStr = `${Math.round(pct)}%`;
 
   fileLbl.textContent = pctStr;
-  fileLblProgress.textContent = pctStr;
 
-  progressBarFill.style.width = pctStr;
-  progressTextContainer.style.width = pctStr;
+  progressBarFill.style.width = `${pct}%`;
+
+  // ИЗМЕНЕНИЕ: Двигаем градиент внутри текста
+  // 100% - это полностью темный текст, 0% - полностью белый
+  fileLbl.style.backgroundPosition = `${100 - pct}% 0`;
 }

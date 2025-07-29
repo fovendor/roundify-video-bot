@@ -3,7 +3,6 @@
     --sh-dark: #b3b3b3;
     --sh-light: #f3f3f3;
     --accent: #0e2647;
-    /* ИЗМЕНЕНИЕ: Цвет для прогресс-бара, как у неактивной кнопки */
     --progress-bar-fill: rgba(14, 38, 71, 0.65);
 }
 
@@ -42,7 +41,7 @@ h1 {
     font-size: 1.4rem
 }
 
-/* --- ИЗМЕНЕНИЯ: Полностью переработанный блок --- */
+/* --- ИЗМЕНЕНИЯ: Реализация через background-clip --- */
 label.upload {
     position: relative;
     display: flex;
@@ -72,53 +71,30 @@ label.upload:hover {
     background-color: var(--progress-bar-fill);
     transition: width 0.2s ease-out;
     z-index: 1;
+    /* Под текстом */
 }
 
-#progressText {
+#fileLabel {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
     z-index: 2;
-}
-
-#fileLabel,
-#fileLabelProgress {
+    /* Над полосой прогресса */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
-    /* Жирный шрифт */
-}
 
-#fileLabel {
-    color: var(--accent);
+    /* Магия начинается здесь */
+    color: transparent;
+    /* Делаем сам текст прозрачным */
+    background: linear-gradient(to right, white 50%, var(--accent) 50%);
+    background-size: 200% 100%;
+    background-position: 100% 0;
+    /* Изначально показываем правую (темную) часть градиента */
+    -webkit-background-clip: text;
+    background-clip: text;
+    transition: background-position 0.2s ease-out;
 }
-
-.progress-text-container {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 0;
-    height: 100%;
-    overflow: hidden;
-    transition: width 0.2s ease-out;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#fileLabelProgress {
-    color: white;
-    width: clamp(280px, 80vw, 380px);
-    /* Ширина, чтобы текст не прыгал */
-    text-align: center;
-}
-
 
 input[type=file] {
     display: none
@@ -275,11 +251,6 @@ input[type=text] {
         overflow-y: auto;
         display: flex;
         flex-direction: column;
-    }
-
-    #fileLabelProgress {
-        width: 85vw;
-        /* Адаптируем под мобильную версию */
     }
 
     .chevron {
