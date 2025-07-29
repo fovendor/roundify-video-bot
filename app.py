@@ -28,8 +28,6 @@ TMP.mkdir(exist_ok=True)
 
 # ────────── Flask / Socket.IO ───────────
 app = Flask(__name__, static_folder="static", template_folder="templates")
-# При использовании gunicorn с eventlet, async_mode определится автоматически.
-# Не указываем его явно, чтобы избежать конфликтов.
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 log = logging.getLogger("roundify")
@@ -121,11 +119,20 @@ def run_ffmpeg_and_notify(job_id: str, src_path_str: str, opts: dict):
             else:
                 log.error(f"FFmpeg did not produce an output file for job {job_id}")
 
-        socketio.emit("done", {
-            "job": job_id,
-            "download": url_for('download', filename=dst_path.name, _external=True),
-            "telegram": tg_ok
-        }, to=job_id)
+        # --- ИЗМЕНЕНИЕ ---
+        # Создаем контекст приложения, чтобы url_for() работал в фоновой задаче
+        with app.app_context():
+            socketio.emit("done", {
+                "job": job_id,
+                "download": url_for('download', filename=dst_path.name, _external=True),
+                "telegram": tg_ok
+            }, to=job_id)
+
+    except Exception as e:
+        log.error(f"Error in background task for job {job_id}: {e}")
+        # Отправляем ошибку на фронтенд
+        with app.app_context():
+            socketio.emit("status_update", {"job": job_id, "status": f"Error: {e}"}, to=job_id)
 
     finally:
         # Гарантированная очистка исходного файла
@@ -184,7 +191,6 @@ def api_convert():
         "chat": request.form.get("chat"),
     }
 
-    # Запуск задачи в фоне, совместимом с eventlet
     socketio.start_background_task(
         run_ffmpeg_and_notify,
         job_id=job_id,
@@ -222,13 +228,7 @@ def janitor():
             pass
         except Exception as e:
             log.error(f"Janitor error: {e}")
-        # Пауза между чистками
         time.sleep(max(TTL_SECONDS, 60))
 
-# Запуск фоновой задачи очистки в виде потока
-# Это безопасно, так как он не взаимодействует с запросами Flask
 janitor_thread = threading.Thread(target=janitor, daemon=True)
 janitor_thread.start()
-
-# Блок `if __name__ == "__main__"` удален, так как запуск осуществляется
-# через Gunicorn, который сам управляет приложением.
