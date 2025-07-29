@@ -10,7 +10,8 @@ const fileInp = $("#file"),
 let currentJobId = null;
 let sourceDuration = 0;
 let clipSec = 60;
-let statusTimer = null;
+let statusTimer = null; // Для таймера обратного отсчета
+let resetTimer = null;  // Для сброса UI
 
 document.addEventListener('DOMContentLoaded', () => { convertBtn.disabled = true; });
 
@@ -151,10 +152,13 @@ sio.on("done", d => {
   status.appendChild(timerSpan);
   status.innerHTML += tg;
 
-  setTimeout(() => {
+  // --- ИЗМЕНЕНИЕ ---
+  // Сбрасываем UI ровно через d.ttl секунд, синхронно с бэкендом
+  if (resetTimer) clearTimeout(resetTimer);
+  resetTimer = setTimeout(() => {
     resetUI();
     status.textContent = 'Ready for next video.';
-  }, 10000);
+  }, d.ttl * 1000);
 
   sio.emit("leave", { job: d.job });
   currentJobId = null;
@@ -164,15 +168,16 @@ function resetUI() {
   convertBtn.disabled = true;
   fileInp.value = '';
   fileLbl.textContent = 'Choose video…';
-  fileLbl.style.color = ''; // Сбрасываем цвет на дефолтный из CSS
+  fileLbl.style.color = '';
   progressBarFill.style.width = '0%';
   status.textContent = '';
   if (statusTimer) clearInterval(statusTimer);
+  if (resetTimer) clearTimeout(resetTimer);
 }
 
 function resetProgress() {
   fileLbl.textContent = '0%';
-  fileLbl.style.color = 'var(--accent)'; // Устанавливаем тёмный цвет в начале
+  fileLbl.style.color = 'var(--accent)';
   progressBarFill.style.width = '0%';
 }
 
@@ -181,8 +186,7 @@ function updateProgress(v) {
   fileLbl.textContent = `${Math.round(pct)}%`;
   progressBarFill.style.width = `${pct}%`;
 
-  // ИЗМЕНЕНИЕ: Простое и надежное переключение цвета по вашему алгоритму
-  if (pct >= 45) {
+  if (pct >= 47) { // Порог, который вы подобрали
     fileLbl.style.color = '#fff';
   } else {
     fileLbl.style.color = 'var(--accent)';
