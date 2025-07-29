@@ -1,35 +1,83 @@
-/* mini‑$ selector */ const $ = s => document.querySelector(s);
+/* mini-$ selector */ const $ = s => document.querySelector(s);
 
 const fileInp = $("#file"), fileLbl = $("#fileLabel"), chevBtn = $("#chevron"),
-  advBlk = $("#advanced"), convert = $("#convert"), status = $("#status"),
-  bar = $("#bar"), pctTxt = $("#pct");
+  advBlk = $("#advanced"), convertBtn = $("#convert"), status = $("#status"),
+  bar = $("#bar"), pctTxt = $("#pct"), durationSlider = $("#duration"),
+  offsetSlider = $("#offset"), sizeSlider = $("#size"), tokenInp = $("#token"),
+  chatInp = $("#chat");
 
-let clipSec = 60;      // актуальная длительность клипа
+let currentJobId = null;
+let sourceDuration = 0;
+let clipSec = 60;
+
+// --- Event Listeners ---
 
 fileInp.addEventListener("change", async () => {
-  fileLbl.textContent = fileInp.files[0]?.name || "Choose video…";
-  if (!fileInp.files[0]) return;
+  const file = fileInp.files[0];
+  fileLbl.textContent = file?.name || "Choose video…";
+  if (!file) {
+    resetUI();
+    return;
+  }
 
-  // ─── запрашиваем метаданные ───
-  status.innerHTML = '<span class="loader"></span>Reading meta…';
+  status.innerHTML = '<span class="loader"></span>Uploading & reading meta…';
+  convertBtn.disabled = true;
+
   const fd = new FormData();
-  fd.append("video", fileInp.files[0]);
+  fd.append("video", file);
 
   try {
-    const r = await fetch("/api/meta", { method: "POST", body: fd });
+    const r = await fetch("/api/upload", { method: "POST", body: fd });
     const meta = await r.json();
     if (!r.ok) throw new Error(meta.error || r.statusText);
 
-    $("#duration").max = Math.ceil(meta.duration);
-    $("#offset").max = Math.floor(meta.duration);
-    clipSec = $("#duration").value;
+    currentJobId = meta.job_id;
+    sourceDuration = meta.duration;
+    clipSec = Math.min(60, sourceDuration); // Устанавливаем длительность по умолчанию, но не больше длины видео
 
+    // Обновляем UI с полученными метаданными
+    updateSliders(sourceDuration, clipSec);
     status.textContent =
-      `Duration: ${meta.duration.toFixed(1)} s | ` +
-      `Resolution: ${meta.width}×${meta.height} | ` +
-      `Size: ${meta.size_mb.toFixed(2)} MB`;
+      `Duration: ${meta.duration.toFixed(1)} s | ` +
+      `Res: ${meta.width}×${meta.height} | ` +
+      `Size: ${meta.size_mb.toFixed(2)} MB`;
+    convertBtn.disabled = false; // Активируем кнопку конвертации
+
+    // Подключаемся к сокету для будущего прогресса
+    sio.emit("join", { job: currentJobId });
+
   } catch (e) {
     status.textContent = "⚠️ " + e.message;
+    resetUI();
+  }
+});
+
+convertBtn.addEventListener("click", async () => {
+  if (!currentJobId) {
+    status.textContent = "Please select a file first.";
+    return;
+  }
+
+  status.textContent = "Processing…";
+  resetProgress();
+  convertBtn.disabled = true;
+
+  const fd = new FormData();
+  fd.append("job_id", currentJobId);
+  fd.append("size", sizeSlider.value);
+  fd.append("duration", durationSlider.value);
+  fd.append("offset", offsetSlider.value);
+  if (tokenInp.value) fd.append("token", tokenInp.value);
+  if (chatInp.value) fd.append("chat", chatInp.value);
+
+  try {
+    const r = await fetch("/api/convert", { method: "POST", body: fd });
+    const res = await r.json();
+    if (!r.ok) throw new Error(res.error || r.statusText);
+
+  } catch (e) {
+    status.textContent = "⚠️ " + e.message;
+    convertBtn.disabled = false;
   }
 });
 
@@ -38,63 +86,82 @@ chevBtn.addEventListener("click", () => {
   advBlk.classList.toggle("open");
 });
 
-const bindRange = (inp, out) => {
-  const i = $(inp), o = $(out);
-  i.addEventListener("input", () => {
-    o.textContent = i.value;
-    if (inp === "#duration") {
-      clipSec = +i.value;
-      $("#offset").max = Math.max(0, $("#duration").max - clipSec);
-    }
-  });
-};
-bindRange("#size", "#sizeOut");
-bindRange("#duration", "#durOut");
-bindRange("#offset", "#offOut");
+// --- Sliders Logic ---
 
-/* force pure WebSocket */
-const sio = io({ transports: ["websocket"] });
+function updateSliders(totalDuration, currentClipDuration) {
+  durationSlider.max = Math.ceil(totalDuration);
+  durationSlider.value = Math.ceil(currentClipDuration);
+  $("#durOut").textContent = durationSlider.value;
 
-function resetProgress() { bar.value = 0; pctTxt.textContent = "0%"; }
-function updatePct(v) { bar.value = v; pctTxt.textContent = Math.round(v * 100) + "%"; }
+  offsetSlider.max = Math.floor(totalDuration - currentClipDuration);
+  offsetSlider.value = 0;
+  $("#offOut").textContent = 0;
+}
 
-convert.addEventListener("click", async () => {
-  if (!fileInp.files[0]) { status.textContent = "Select a file first."; return; }
-  status.textContent = "Uploading…"; resetProgress();
-
-  const fd = new FormData();
-  fd.append("video", fileInp.files[0]);
-  fd.append("size", $("#size").value);
-  fd.append("duration", $("#duration").value);
-  fd.append("offset", $("#offset").value);
-  if ($("#token").value) fd.append("token", $("#token").value);
-  if ($("#chat").value) fd.append("chat", $("#chat").value);
-
-  try {
-    const r = await fetch("/api/upload", { method: "POST", body: fd });
-    const { job_id, error } = await r.json();
-    if (!r.ok) throw new Error(error || r.statusText);
-
-    sio.emit("join", { job: job_id });
-
-    sio.once("metadata", d => {              // пришло ещё раз, но не страшно
-      if (d.job === job_id) clipSec = $("#duration").value;
-    });
-
-    sio.on("progress", d => {
-      if (d.job !== job_id) return;
-      updatePct(d.ms / (clipSec * 1000));
-    });
-
-    sio.once("done", d => {
-      if (d.job !== job_id) return;
-      updatePct(1);
-      const tg = d.telegram ? " ↗️ sent&nbsp;to&nbsp;TG" : "";
-      status.innerHTML = `Done — <a href="${d.download}">Download</a>${tg}`;
-      sio.emit("leave", { job: job_id });
-    });
-
-    status.textContent = "Processing…";
-
-  } catch (e) { status.textContent = "⚠️ " + e.message; }
+durationSlider.addEventListener("input", () => {
+  clipSec = +durationSlider.value;
+  $("#durOut").textContent = clipSec;
+  // Корректируем максимальное смещение при изменении длительности
+  offsetSlider.max = Math.max(0, Math.floor(sourceDuration - clipSec));
+  if (+offsetSlider.value > +offsetSlider.max) {
+    offsetSlider.value = offsetSlider.max;
+    $("#offOut").textContent = offsetSlider.value;
+  }
 });
+
+offsetSlider.addEventListener("input", () => {
+  $("#offOut").textContent = offsetSlider.value;
+});
+
+sizeSlider.addEventListener("input", () => {
+  $("#sizeOut").textContent = sizeSlider.value;
+});
+
+
+// --- WebSocket Logic ---
+
+const sio = io({ transports: ["websocket"], autoConnect: true });
+
+sio.on("connect", () => {
+  console.log("Socket.IO connected!");
+});
+
+sio.on("progress", d => {
+  if (d.job !== currentJobId) return;
+  const progressValue = d.ms / (clipSec * 1000);
+  updatePct(Math.min(1, progressValue)); // Убедимся, что не превышает 100%
+});
+
+sio.on("done", d => {
+  if (d.job !== currentJobId) return;
+  updatePct(1);
+  const tg = d.telegram ? " ↗️ sent to TG" : "";
+  status.innerHTML = `Done — <a href="${d.download}" target="_blank">Download</a>${tg}`;
+  sio.emit("leave", { job: d.job });
+  currentJobId = null; // Сбрасываем ID задачи
+});
+
+sio.on("connect_error", (err) => {
+  console.error("Socket connection error:", err);
+  status.textContent = "⚠️ WebSocket connection failed.";
+});
+
+
+// --- UI Helper Functions ---
+
+function resetUI() {
+  convertBtn.disabled = true;
+  status.textContent = "";
+  fileLbl.textContent = "Choose video…";
+  resetProgress();
+}
+
+function resetProgress() {
+  bar.value = 0;
+  pctTxt.textContent = "0%";
+}
+
+function updatePct(v) {
+  bar.value = v;
+  pctTxt.textContent = Math.round(v * 100) + "%";
+}

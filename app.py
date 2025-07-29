@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Roundify‑WS — video‑to‑circle converter with real‑time WebSocket progress
-и авто‑отправкой в Telegram + авто‑TTL‑очисткой.
+Roundify-WS — video-to-circle converter with real-time WebSocket progress
+и авто-отправкой в Telegram + авто-TTL-очисткой.
 """
 from __future__ import annotations
-import json, os, subprocess, tempfile, uuid, pathlib as pl, time, threading, shutil, logging
+import json, os, subprocess, tempfile, uuid, pathlib as pl, time, threading, logging
 from concurrent.futures import ProcessPoolExecutor
 from typing import Optional
 
@@ -21,7 +21,7 @@ TMP.mkdir(exist_ok=True)
 
 # ────────── Flask / Socket.IO ───────────
 app = Flask(__name__, static_folder="static", template_folder="templates")
-socketio = SocketIO(app, cors_allowed_origins="*")        # message_queue можно докрутить
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 EXECUTOR = ProcessPoolExecutor(max_workers=WORKERS)
 log      = logging.getLogger("roundify")
@@ -48,7 +48,7 @@ def calc_video_bitrate(max_mb: int, clip_sec: int, audio_kbps: int = 128) -> int
 def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
     url = f"https://api.telegram.org/bot{token}/sendVideoNote"
     with path.open("rb") as f:
-        r = requests.post(url, data={"chat_id": chat}, files={"video_note": f}, timeout=120)
+        r = requests.post(url, data={"chat_id": chat, "supports_streaming": "true"}, files={"video_note": f}, timeout=120)
     if not r.ok:
         log.warning("Telegram error %s – %s", r.status_code, r.text)
     return r.ok
@@ -56,6 +56,7 @@ def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
 # ───────── FFmpeg Worker ─────
 def run_ffmpeg(job_id: str, src: str, opts: dict):
     src = pl.Path(src)
+    # Метаданные уже отправлены на фронт, но могут быть полезны для внутреннего использования
     meta = ffprobe_meta(src)
     socketio.emit("metadata", {**meta, "size_mb": round(src.stat().st_size / 2**20, 2), "job": job_id}, to=job_id)
 
@@ -75,85 +76,105 @@ def run_ffmpeg(job_id: str, src: str, opts: dict):
            "-progress", "pipe:1", "-f", "mp4", str(dst)]
 
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.DEVNULL, text=True)
+                            stderr=subprocess.DEVNULL, text=True, encoding='utf-8')
 
     for line in proc.stdout:
         if line.startswith("out_time_ms"):
-            ms = int(line.split("=")[1])
-            socketio.emit("progress", {"job": job_id, "ms": ms}, to=job_id)
+            try:
+                ms = int(line.strip().split("=")[1])
+                socketio.emit("progress", {"job": job_id, "ms": ms}, to=job_id)
+            except (ValueError, IndexError):
+                continue
         elif line.strip() == "progress=end":
             break
     proc.wait()
 
-    # ─── отправляем в TG если надо ───
+    tg_ok = False
     if opts.get("token") and opts.get("chat"):
-        tg_ok = send_to_telegram(dst, opts["token"], opts["chat"])
-    else:
-        tg_ok = False
+        if dst.exists() and dst.stat().st_size > 0:
+            tg_ok = send_to_telegram(dst, opts["token"], opts["chat"])
+        else:
+            log.error(f"FFmpeg did not produce an output file for job {job_id}")
 
     socketio.emit("done",
                   {"job": job_id,
                    "download": url_for('download', filename=dst.name, _external=True),
                    "telegram": tg_ok},
                   to=job_id)
-    src.unlink(missing_ok=True)          # исходник больше не нужен
+    src.unlink(missing_ok=True)
 
 # ───────────── routes ───────────────────
 @app.route("/")
-def index(): 
+def index():
     return render_template("index.html")
-
-@app.post("/api/meta")
-def api_meta():
-    """При загрузке файла отправляем метаданные без конвертации."""
-    up = request.files.get("video")
-    if not up:
-        return jsonify(error="file field missing"), 400
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        up.save(tmp.name)
-        p = pl.Path(tmp.name)
-        meta = ffprobe_meta(p)
-        size_mb = round(p.stat().st_size / 2**20, 2)
-    p.unlink(missing_ok=True)
-    return jsonify(duration=meta["duration"], width=meta["width"],
-                   height=meta["height"], size_mb=size_mb)
 
 @app.post("/api/upload")
 def api_upload():
     up = request.files.get("video")
-    if not up: 
+    if not up:
         return jsonify(error="file field missing"), 400
+
     job_id = uuid.uuid4().hex
-    tmp_in = TMP / f"in_{job_id}"
+    tmp_in = TMP / f"in_{job_id}_{up.filename}"
     up.save(tmp_in)
+
+    try:
+        meta = ffprobe_meta(tmp_in)
+        size_mb = round(tmp_in.stat().st_size / 2**20, 2)
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        log.error(f"Failed to get metadata for {tmp_in}: {e}")
+        tmp_in.unlink(missing_ok=True)
+        return jsonify(error="Invalid video file"), 400
+
+    return jsonify(
+        job_id=job_id,
+        duration=meta["duration"],
+        width=meta["width"],
+        height=meta["height"],
+        size_mb=size_mb
+    )
+
+@app.post("/api/convert")
+def api_convert():
+    job_id = request.form.get("job_id")
+    if not job_id:
+        return jsonify(error="job_id missing"), 400
+
+    # Находим исходный файл по job_id
+    try:
+        tmp_in = next(TMP.glob(f"in_{job_id}_*"))
+    except StopIteration:
+        return jsonify(error="Original file not found for this job_id"), 404
+
+    is_for_telegram = bool(request.form.get("token") and request.form.get("chat"))
 
     opts = dict(
         size     = int(request.form.get("size", 640)),
-        offset   = int(request.form.get("offset", 0)),
-        clip_sec = int(request.form.get("duration", 60)),
-        max_mb   = 48 if request.form.get("token") and request.form.get("chat") else 100,
+        offset   = float(request.form.get("offset", 0)),
+        clip_sec = float(request.form.get("duration", 60)),
+        # Для кружочков в Telegram ставим безопасный лимит в 8МБ
+        max_mb   = 8 if is_for_telegram else 100,
         token    = request.form.get("token"),
         chat     = request.form.get("chat"),
     )
     EXECUTOR.submit(run_ffmpeg, job_id, str(tmp_in), opts)
-    return jsonify(job_id=job_id)
+    return jsonify(status="ok", message="Conversion started")
 
 @socketio.on("join")
-def on_join(data): 
+def on_join(data):
     join_room(data["job"])
 
 @socketio.on("leave")
-def on_leave(data): 
+def on_leave(data):
     leave_room(data["job"])
 
 @app.get("/download/<path:filename>")
 def download(filename):
-    """Отдаём файл, пока не истёк TTL."""
     return send_from_directory(TMP, filename, as_attachment=True,
                                max_age=TTL_SECONDS)
 
 @app.get("/ping")
-def ping(): 
+def ping():
     return "pong"
 
 # ────── background TTL janitor ──────
@@ -163,14 +184,22 @@ def janitor():
         for p in TMP.iterdir():
             try:
                 if p.stat().st_mtime < now - TTL_SECONDS:
-                    p.unlink()
+                    p.unlink(missing_ok=True)
             except FileNotFoundError:
                 pass
-        time.sleep(max(TTL_SECONDS // 2, 30))
+        # Пауза между чистками
+        time.sleep(max(TTL_SECONDS, 60))
 
-socketio.start_background_task(janitor)
+
+# Запуск фоновой задачи очистки
+if os.getenv("GUNICORN_CMD_ARGS"):
+    socketio.start_background_task(janitor)
 
 # ─────────── dev runner ────────────────
 if __name__ == "__main__":
-    import eventlet; eventlet.monkey_patch()
+    import eventlet
+    eventlet.monkey_patch()
+    # Запускаем чистильщика только в основном процессе, чтобы избежать дублирования
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+         threading.Thread(target=janitor, daemon=True).start()
     socketio.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
