@@ -41,7 +41,7 @@ h1 {
     font-size: 1.4rem;
 }
 
-/* --- ИЗМЕНЕНИЯ: Финальная реализация с переключением класса --- */
+/* --- ИЗМЕНЕНИЯ: Простая и надежная структура --- */
 label.upload {
     position: relative;
     display: flex;
@@ -83,13 +83,10 @@ label.upload:hover {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    /* Изначально текст тёмный */
+    /* Изначально текст всегда тёмный. JS будет управлять цветом. */
     color: var(--accent);
-}
-
-#fileLabel.is-blending {
-    color: white;
-    mix-blend-mode: difference;
+    transition: color 0.1s linear;
+    /* Плавный переход цвета */
 }
 
 input[type=file] {

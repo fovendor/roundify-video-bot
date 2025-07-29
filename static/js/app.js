@@ -164,7 +164,7 @@ function resetUI() {
   convertBtn.disabled = true;
   fileInp.value = '';
   fileLbl.textContent = 'Choose video…';
-  fileLbl.classList.remove('is-blending'); // Убираем эффект
+  fileLbl.style.color = ''; // Сбрасываем цвет на дефолтный из CSS
   progressBarFill.style.width = '0%';
   status.textContent = '';
   if (statusTimer) clearInterval(statusTimer);
@@ -172,7 +172,7 @@ function resetUI() {
 
 function resetProgress() {
   fileLbl.textContent = '0%';
-  fileLbl.classList.add('is-blending'); // Включаем эффект
+  fileLbl.style.color = 'var(--accent)'; // Устанавливаем тёмный цвет в начале
   progressBarFill.style.width = '0%';
 }
 
@@ -180,4 +180,11 @@ function updateProgress(v) {
   const pct = Math.min(100, v * 100);
   fileLbl.textContent = `${Math.round(pct)}%`;
   progressBarFill.style.width = `${pct}%`;
+
+  // ИЗМЕНЕНИЕ: Простое и надежное переключение цвета по вашему алгоритму
+  if (pct >= 45) {
+    fileLbl.style.color = '#fff';
+  } else {
+    fileLbl.style.color = 'var(--accent)';
+  }
 }
