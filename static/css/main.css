@@ -7,12 +7,12 @@
 
 * {
     box-sizing: border-box;
-    font-family: system-ui, sans-serif;
+    font-family: system-ui, sans-serif
 }
 
 html,
 body {
-    height: 100%;
+    height: 100%
 }
 
 body {
@@ -37,18 +37,17 @@ body {
 h1 {
     margin: 0 0 1.2rem;
     text-align: center;
-    font-size: 1.4rem;
+    font-size: 1.4rem
 }
 
 label.upload {
     display: block;
-    padding: 0.9rem;
+    padding: .9rem;
     border-radius: 1rem;
     text-align: center;
     cursor: pointer;
     background: var(--bg);
-    box-shadow: inset -6px -6px 12px var(--sh-light),
-        inset 6px 6px 12px var(--sh-dark);
+    box-shadow: inset -6px -6px 12px var(--sh-light), inset 6px 6px 12px var(--sh-dark);
     user-select: none;
     margin-bottom: 1rem;
     color: var(--accent);
@@ -56,16 +55,16 @@ label.upload {
 }
 
 label.upload:hover {
-    filter: brightness(.95);
+    filter: brightness(.95)
 }
 
 input[type=file] {
-    display: none;
+    display: none
 }
 
 #convert {
     width: 100%;
-    padding: 0.9rem;
+    padding: .9rem;
     border: none;
     border-radius: 1rem;
     background: var(--accent);
@@ -78,7 +77,7 @@ input[type=file] {
 
 #convert:active {
     transform: translateY(2px);
-    margin-bottom: 0;
+    margin-bottom: 0
 }
 
 .chevron {
@@ -86,7 +85,7 @@ input[type=file] {
     display: block;
     width: 32px;
     height: 24px;
-    margin: 0.8rem auto 0;
+    margin: .8rem auto 0;
     background: none;
     border: none;
     cursor: pointer;
@@ -104,45 +103,46 @@ input[type=file] {
 }
 
 .chevron span:first-child {
-    transform: translateX(-10px) rotate(45deg);
+    transform: translateX(-10px) rotate(45deg)
 }
 
 .chevron span:last-child {
-    transform: translateX(10px) rotate(-45deg);
+    transform: translateX(10px) rotate(-45deg)
 }
 
 .chevron.open span:first-child {
-    transform: translateX(10px) rotate(45deg);
+    transform: translateX(10px) rotate(45deg)
 }
 
 .chevron.open span:last-child {
-    transform: translateX(-10px) rotate(-45deg);
+    transform: translateX(-10px) rotate(-45deg)
 }
 
 .advanced {
     padding: .5rem;
     overflow: hidden;
     max-height: 0;
-    transition: max-height .6s cubic-bezier(.4, 0, .2, 1);
+    transition: max-height .6s cubic-bezier(.4, 0, .2, 1)
 }
 
 .advanced.open {
-    max-height: 350px;
+    max-height: 1000px;
+    overflow: visible;
 }
 
 .slider-wrap {
-    margin: 0.8rem 0;
+    margin: .8rem 0
 }
 
 .slider-wrap label {
     display: flex;
     justify-content: space-between;
     font-size: .9rem;
-    margin-bottom: .3rem;
+    margin-bottom: .3rem
 }
 
 input[type=range] {
-    width: 100%;
+    width: 100%
 }
 
 input[type=text] {
@@ -153,37 +153,53 @@ input[type=text] {
     margin-bottom: .8rem;
     background: var(--bg);
     color: var(--accent);
-    box-shadow: inset -6px -6px 12px var(--sh-light),
-        inset 6px 6px 12px var(--sh-dark);
+    box-shadow: inset -6px -6px 12px var(--sh-light), inset 6px 6px 12px var(--sh-dark);
 }
 
 .small {
     font-size: .8rem;
     opacity: .8;
+    line-height: 1.3
 }
 
 .result {
     text-align: center;
-    margin-top: 1rem;
+    margin-top: 1rem
 }
 
 .result a {
     color: var(--accent);
     font-weight: 600;
-    text-decoration: none;
+    text-decoration: none
 }
 
-@media (max-width: 600px) {
+.loader {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-right: .5em;
+    border: .15em solid var(--accent);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin .9s linear infinite;
+    vertical-align: -.2em;
+}
 
+@keyframes spin {
+    to {
+        transform: rotate(360deg)
+    }
+}
+
+@media(max-width:600px) {
     body {
-        align-items: flex-start;
+        align-items: flex-start
     }
 
     .card {
         width: 100vw;
         min-height: 100svh;
         min-height: 100dvh;
-        /* fallback for new browsers */
         padding: 1.5rem 1.2rem calc(2rem + env(safe-area-inset-bottom));
         border-radius: 0;
         box-shadow: none;
@@ -193,10 +209,10 @@ input[type=text] {
     }
 
     .chevron {
-        margin: 1.4rem auto 0;
+        margin: 1.4rem auto 0
     }
 
     .result {
-        margin-top: auto;
+        margin-top: auto
     }
 }
