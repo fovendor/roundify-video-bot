@@ -69,7 +69,6 @@ def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
 
 # ───────── FFmpeg Background Task ─────
 def run_ffmpeg_and_notify(job_id: str, src_path_str: str, dst_filename: str, download_url: str, opts: dict):
-    """Фоновая задача, которая НЕ вызывает url_for, а использует готовую ссылку."""
     src_path = pl.Path(src_path_str)
     dst_path = TMP / dst_filename
 
@@ -103,10 +102,13 @@ def run_ffmpeg_and_notify(job_id: str, src_path_str: str, dst_filename: str, dow
                 socketio.emit("status_update", {"job": job_id, "status": "Sending to Telegram..."}, to=job_id)
                 tg_ok = send_to_telegram(dst_path, opts["token"], opts["chat"])
 
+        # --- ИЗМЕНЕНИЕ ---
+        # Добавляем TTL в финальное событие
         socketio.emit("done", {
             "job": job_id,
-            "download": download_url, # Используем готовую ссылку
-            "telegram": tg_ok
+            "download": download_url,
+            "telegram": tg_ok,
+            "ttl": TTL_SECONDS
         }, to=job_id)
 
     except Exception as e:
@@ -167,7 +169,6 @@ def api_convert():
         "chat": request.form.get("chat"),
     }
     
-    # ИЗМЕНЕНИЕ: Генерируем имя файла и ссылку здесь, внутри контекста запроса
     dst_filename = f"{tmp_in.stem}_round.mp4"
     download_url = url_for('download', filename=dst_filename)
 

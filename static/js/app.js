@@ -1,26 +1,35 @@
 /* mini-$ selector */ const $ = s => document.querySelector(s);
 
-const fileInp = $("#file"), fileLbl = $("#fileLabel"), chevBtn = $("#chevron"),
-  advBlk = $("#advanced"), convertBtn = $("#convert"), status = $("#status"),
-  bar = $("#bar"), pctTxt = $("#pct"), durationSlider = $("#duration"),
-  offsetSlider = $("#offset"), sizeSlider = $("#size"), tokenInp = $("#token"),
-  chatInp = $("#chat");
+const fileInp = $("#file"), fileLbl = $("#fileLabel"), uploadLabel = $("#uploadLabel"),
+  chevBtn = $("#chevron"), advBlk = $("#advanced"), convertBtn = $("#convert"),
+  status = $("#status"), durationSlider = $("#duration"), offsetSlider = $("#offset"),
+  sizeSlider = $("#size"), tokenInp = $("#token"), chatInp = $("#chat");
 
 let currentJobId = null;
 let sourceDuration = 0;
 let clipSec = 60;
+let statusTimer = null; // Для таймера TTL
+
+// --- Инициализация ---
+document.addEventListener('DOMContentLoaded', () => {
+  convertBtn.disabled = true; // Кнопка "Convert" неактивна при старте
+});
+
 
 // --- Event Listeners ---
 
 fileInp.addEventListener("change", async () => {
   const file = fileInp.files[0];
-  fileLbl.textContent = file?.name || "Choose video…";
   if (!file) {
     resetUI();
     return;
   }
 
-  status.innerHTML = '<span class="loader"></span>Uploading & reading meta…';
+  fileLbl.textContent = file.name;
+  fileLbl.style.fontWeight = 'normal';
+  uploadLabel.style.backgroundSize = '0% 100%';
+
+  status.innerHTML = '<span class="loader"></span>Reading meta…';
   convertBtn.disabled = true;
 
   const fd = new FormData();
@@ -33,14 +42,10 @@ fileInp.addEventListener("change", async () => {
 
     currentJobId = meta.job_id;
     sourceDuration = meta.duration;
-    // Используем актуальную длительность клипа из слайдера
-    clipSec = +durationSlider.value;
 
-    updateSliders(sourceDuration, Math.min(60, sourceDuration));
-    status.textContent =
-      `Duration: ${meta.duration.toFixed(1)} s | ` +
-      `Res: ${meta.width}×${meta.height} | ` +
-      `Size: ${meta.size_mb.toFixed(2)} MB`;
+    updateSliders(sourceDuration, Math.min(parseInt(durationSlider.max, 10), sourceDuration));
+
+    status.textContent = `Duration: ${meta.duration.toFixed(1)}s | Res: ${meta.width}×${meta.height}`;
     convertBtn.disabled = false;
 
     sio.emit("join", { job: currentJobId });
@@ -57,10 +62,9 @@ convertBtn.addEventListener("click", async () => {
     return;
   }
 
-  status.textContent = "Processing…";
   resetProgress();
+  status.textContent = "Uploading & processing…";
   convertBtn.disabled = true;
-  // Обновляем длительность клипа перед отправкой
   clipSec = +durationSlider.value;
 
   const fd = new FormData();
@@ -90,7 +94,7 @@ chevBtn.addEventListener("click", () => {
 // --- Sliders Logic ---
 
 function updateSliders(totalDuration, defaultClipDuration) {
-  durationSlider.max = Math.ceil(totalDuration);
+  durationSlider.max = Math.ceil(Math.min(totalDuration, parseInt(durationSlider.max, 10)));
   durationSlider.value = Math.ceil(defaultClipDuration);
   $("#durOut").textContent = durationSlider.value;
   clipSec = defaultClipDuration;
@@ -105,68 +109,95 @@ durationSlider.addEventListener("input", () => {
   $("#durOut").textContent = clipSec;
   offsetSlider.max = Math.max(0, Math.floor(sourceDuration - clipSec));
   if (+offsetSlider.value > +offsetSlider.max) {
-      offsetSlider.value = offsetSlider.max;
-      $("#offOut").textContent = offsetSlider.value;
+    offsetSlider.value = offsetSlider.max;
+    $("#offOut").textContent = offsetSlider.value;
   }
 });
 
-offsetSlider.addEventListener("input", () => {
-    $("#offOut").textContent = offsetSlider.value;
-});
-
-sizeSlider.addEventListener("input", () => {
-    $("#sizeOut").textContent = sizeSlider.value;
-});
+offsetSlider.addEventListener("input", () => $("#offOut").textContent = offsetSlider.value);
+sizeSlider.addEventListener("input", () => $("#sizeOut").textContent = sizeSlider.value);
 
 // --- WebSocket Logic ---
 
 const sio = io({ transports: ["websocket"], autoConnect: true });
 
-sio.on("connect", () => console.log("Socket.IO connected!"));
-
 sio.on("progress", d => {
   if (d.job !== currentJobId) return;
-  // ИЗМЕНЕНИЕ: Теперь расчет корректный (миллисекунды / миллисекунды)
   const progressValue = d.ms / (clipSec * 1000);
-  updatePct(progressValue);
+  updateProgress(progressValue);
 });
 
 sio.on("status_update", d => {
-    if (d.job !== currentJobId) return;
-    status.textContent = d.status;
+  if (d.job !== currentJobId) return;
+  status.textContent = d.status;
 });
 
 sio.on("done", d => {
   if (d.job !== currentJobId) return;
-  updatePct(1); // Финальные 100%
-  const tg = d.telegram ? " ↗️ sent to TG" : "";
-  status.innerHTML = `Done — <a href="${d.download}" target="_blank">Download</a>${tg}`;
-  convertBtn.disabled = false;
+  updateProgress(1); // Финальные 100%
+
+  const tg = d.telegram ? " ↗️ Sent to TG" : "";
+
+  const downloadLink = document.createElement('a');
+  downloadLink.href = d.download;
+  downloadLink.target = "_blank";
+  downloadLink.textContent = "Download";
+
+  const timerSpan = document.createElement('span');
+  timerSpan.style.marginLeft = '10px';
+
+  let remainingTime = d.ttl;
+  if (statusTimer) clearInterval(statusTimer);
+
+  const updateTimer = () => {
+    if (remainingTime > 0) {
+      timerSpan.textContent = `(expires in ${remainingTime}s)`;
+      remainingTime--;
+    } else {
+      timerSpan.textContent = "(expired)";
+      downloadLink.style.pointerEvents = "none";
+      downloadLink.style.textDecoration = "line-through";
+      clearInterval(statusTimer);
+    }
+  };
+
+  statusTimer = setInterval(updateTimer, 1000);
+  updateTimer();
+
+  status.innerHTML = `Done — `;
+  status.appendChild(downloadLink);
+  status.appendChild(timerSpan);
+  status.innerHTML += tg;
+
+  setTimeout(() => {
+    resetUI();
+    status.textContent = 'Ready for next video.';
+  }, 5000);
+
   sio.emit("leave", { job: d.job });
   currentJobId = null;
-});
-
-sio.on("connect_error", (err) => {
-  console.error("Socket connection error:", err);
-  status.textContent = "⚠️ WebSocket connection failed.";
 });
 
 // --- UI Helper Functions ---
 
 function resetUI() {
   convertBtn.disabled = true;
-  status.textContent = "";
-  fileLbl.textContent = "Choose video…";
-  resetProgress();
+  fileInp.value = ''; // Сбрасываем выбранный файл
+  uploadLabel.style.backgroundSize = '0% 100%';
+  fileLbl.textContent = 'Choose video…';
+  fileLbl.style.fontWeight = 'normal';
+  status.textContent = '';
+  if (statusTimer) clearInterval(statusTimer);
 }
 
 function resetProgress() {
-  bar.value = 0;
-  pctTxt.textContent = "0%";
+  uploadLabel.style.backgroundSize = '0% 100%';
+  fileLbl.textContent = '0%';
+  fileLbl.style.fontWeight = 'bold';
 }
 
-function updatePct(v) {
-  const clampedValue = Math.min(1, Math.max(0, v)); // Гарантируем, что значение в диапазоне [0, 1]
-  bar.value = clampedValue;
-  pctTxt.textContent = Math.round(clampedValue * 100) + "%";
+function updateProgress(v) {
+  const pct = Math.min(100, Math.round(v * 100));
+  uploadLabel.style.backgroundSize = `${pct}% 100%`;
+  fileLbl.textContent = `${pct}%`;
 }

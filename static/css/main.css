@@ -3,6 +3,8 @@
     --sh-dark: #b3b3b3;
     --sh-light: #f3f3f3;
     --accent: #0e2647;
+    --accent-transp: rgba(14, 38, 71, 0.4);
+    /* Полупрозрачный цвет для прогресс-бара */
 }
 
 * {
@@ -40,8 +42,12 @@ h1 {
     font-size: 1.4rem
 }
 
+/* --- ИЗМЕНЕНИЕ: Стили для кнопки-прогресс-бара --- */
 label.upload {
-    display: block;
+    display: flex;
+    /* Для центрирования текста */
+    align-items: center;
+    justify-content: center;
     padding: .9rem;
     border-radius: 1rem;
     text-align: center;
@@ -51,12 +57,31 @@ label.upload {
     user-select: none;
     margin-bottom: 1rem;
     color: var(--accent);
-    transition: filter .15s;
+    transition: filter .15s, background-size 0.2s ease-out;
+    /* Добавлена анимация для фона */
+    overflow: hidden;
+    /* Обрезаем текст, который может вылезти */
+    white-space: nowrap;
+    /* Запрещаем перенос строки для имени файла */
+    text-overflow: ellipsis;
+    /* Добавляем многоточие если имя файла длинное */
+
+    /* Стили для градиента, который будет нашим прогресс-баром */
+    background-image: linear-gradient(to right, var(--accent-transp), var(--accent-transp));
+    background-repeat: no-repeat;
+    background-size: 0% 100%;
+    /* Начальное состояние - 0% ширины */
 }
 
 label.upload:hover {
     filter: brightness(.95)
 }
+
+#fileLabel {
+    font-variant-numeric: tabular-nums;
+    /* Цифры процентов не "прыгают" */
+}
+
 
 input[type=file] {
     display: none
@@ -78,6 +103,11 @@ input[type=file] {
 #convert:active {
     transform: translateY(2px);
     margin-bottom: 0
+}
+
+#convert:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .chevron {
@@ -164,7 +194,9 @@ input[type=text] {
 
 .result {
     text-align: center;
-    margin-top: 1rem
+    margin-top: 1rem;
+    min-height: 1.2rem;
+    /* Резервируем место, чтобы верстка не прыгала */
 }
 
 .result a {
@@ -210,36 +242,5 @@ input[type=text] {
 
     .chevron {
         margin: 1.4rem auto 0
-    }
-
-    .result {
-        margin-top: auto
-    }
-
-    progress {
-        width: 100%;
-        height: 8px;
-        margin-top: 1rem;
-        appearance: none;
-        border: none;
-        border-radius: 4px;
-        background: var(--sh-light);
-    }
-
-    progress::-webkit-progress-bar {
-        background: var(--sh-light);
-        border-radius: 4px;
-    }
-
-    progress::-webkit-progress-value {
-        background: var(--accent);
-        border-radius: 4px;
-    }
-
-    #pct {
-        display: inline-block;
-        width: 3rem;
-        text-align: right;
-        margin-left: .5rem;
     }
 }

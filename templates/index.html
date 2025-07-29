@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -9,16 +10,15 @@
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}?v=2">
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
+
 <body>
   <main class="card">
     <h1>Roundify</h1>
 
-    <label class="upload" for="file">
+    <label class="upload" for="file" id="uploadLabel">
       <input id="file" type="file" accept="video/*" hidden>
       <span id="fileLabel">Choose video…</span>
     </label>
-
-    <p id="status" class="result"></p>
 
     <button id="convert">Convert</button>
 
@@ -34,7 +34,6 @@
 
       <div class="slider-wrap">
         <label>Duration (s) <output id="durOut">60</output></label>
-        <!-- ИЗМЕНЕНИЕ: max устанавливается с бэкенда -->
         <input type="range" id="duration" min="1" max="{{ max_clip_seconds }}" value="{{ max_clip_seconds }}">
       </div>
 
@@ -44,13 +43,16 @@
       </div>
 
       <input type="text" id="token" placeholder="Bot token">
-      <input type="text" id="chat"  placeholder="@channel or chat-id">
+      <input type="text" id="chat" placeholder="@channel or chat-id">
+
+      <!-- ИЗМЕНЕНИЕ: Блок статуса перемещен сюда -->
       <p class="small">Заполните оба поля — видео улетит в Telegram кружочком (≤ 50 MB).</p>
+      <p id="status" class="result"></p>
     </section>
 
-    <progress id="bar" max="1" value="0"></progress>
-    <span id="pct">0%</span>
+    <!-- Старый прогресс-бар удален -->
   </main>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
+
 </html>
