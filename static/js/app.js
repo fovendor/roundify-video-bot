@@ -2,8 +2,9 @@
 
 const fileInp = $("#file"),
   fileLbl = $("#fileLabel"),
+  fileLblProgress = $("#fileLabelProgress"),
+  progressTextContainer = $(".progress-text-container"),
   progressBarFill = $("#progressBarFill"),
-  uploadLabel = $("#uploadLabel"),
   chevBtn = $("#chevron"), advBlk = $("#advanced"), convertBtn = $("#convert"),
   status = $("#status"), durationSlider = $("#duration"), offsetSlider = $("#offset"),
   sizeSlider = $("#size"), tokenInp = $("#token"), chatInp = $("#chat");
@@ -13,19 +14,15 @@ let sourceDuration = 0;
 let clipSec = 60;
 let statusTimer = null;
 
-document.addEventListener('DOMContentLoaded', () => {
-  convertBtn.disabled = true;
-});
+document.addEventListener('DOMContentLoaded', () => { convertBtn.disabled = true; });
 
 fileInp.addEventListener("change", async () => {
   const file = fileInp.files[0];
-  if (!file) {
-    resetUI();
-    return;
-  }
+  if (!file) { resetUI(); return; }
 
   resetUI();
   fileLbl.textContent = file.name;
+  fileLblProgress.textContent = file.name;
 
   status.innerHTML = '<span class="loader"></span>Reading meta…';
 
@@ -54,10 +51,7 @@ fileInp.addEventListener("change", async () => {
 });
 
 convertBtn.addEventListener("click", async () => {
-  if (!currentJobId) {
-    status.textContent = "Please select a file first.";
-    return;
-  }
+  if (!currentJobId) { status.textContent = "Please select a file first."; return; }
 
   resetProgress();
   status.textContent = "Processing…";
@@ -116,8 +110,7 @@ const sio = io({ transports: ["websocket"], autoConnect: true });
 
 sio.on("progress", d => {
   if (d.job !== currentJobId) return;
-  const progressValue = d.ms / (clipSec * 1000);
-  updateProgress(progressValue);
+  updateProgress(d.ms / (clipSec * 1000));
 });
 
 sio.on("status_update", d => {
@@ -174,8 +167,9 @@ function resetUI() {
   convertBtn.disabled = true;
   fileInp.value = '';
   fileLbl.textContent = 'Choose video…';
-  fileLbl.style.backgroundPosition = '100% 0'; // Сбрасываем градиент
+  fileLblProgress.textContent = 'Choose video…';
   progressBarFill.style.width = '0%';
+  progressTextContainer.style.width = '0%';
   status.textContent = '';
   if (statusTimer) clearInterval(statusTimer);
 }
@@ -183,8 +177,9 @@ function resetUI() {
 function resetProgress() {
   const initialText = '0%';
   fileLbl.textContent = initialText;
-  fileLbl.style.backgroundPosition = '100% 0'; // Сбрасываем градиент
+  fileLblProgress.textContent = initialText;
   progressBarFill.style.width = '0%';
+  progressTextContainer.style.width = '0%';
 }
 
 function updateProgress(v) {
@@ -192,10 +187,8 @@ function updateProgress(v) {
   const pctStr = `${Math.round(pct)}%`;
 
   fileLbl.textContent = pctStr;
+  fileLblProgress.textContent = pctStr;
 
   progressBarFill.style.width = `${pct}%`;
-
-  // ИЗМЕНЕНИЕ: Двигаем градиент внутри текста
-  // 100% - это полностью темный текст, 0% - полностью белый
-  fileLbl.style.backgroundPosition = `${100 - pct}% 0`;
+  progressTextContainer.style.width = `${pct}%`;
 }

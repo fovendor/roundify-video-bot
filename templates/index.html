@@ -15,10 +15,17 @@
   <main class="card">
     <h1>Roundify</h1>
 
+    <!-- ИЗМЕНЕНИЕ: Финальная, надежная структура -->
     <label class="upload" for="file" id="uploadLabel">
       <input id="file" type="file" accept="video/*" hidden>
+      <!-- Слой 1: Полоса прогресса -->
       <div id="progressBarFill"></div>
+      <!-- Слой 2: Темный текст (подложка) -->
       <span id="fileLabel">Choose video…</span>
+      <!-- Слой 3: Контейнер-маска для белого текста -->
+      <div class="progress-text-container">
+        <span id="fileLabelProgress"></span>
+      </div>
     </label>
 
     <button id="convert">Convert</button>
