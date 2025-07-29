@@ -2,8 +2,6 @@
 
 const fileInp = $("#file"),
   fileLbl = $("#fileLabel"),
-  fileLblProgress = $("#fileLabelProgress"),
-  progressTextContainer = $(".progress-text-container"),
   progressBarFill = $("#progressBarFill"),
   chevBtn = $("#chevron"), advBlk = $("#advanced"), convertBtn = $("#convert"),
   status = $("#status"), durationSlider = $("#duration"), offsetSlider = $("#offset"),
@@ -22,7 +20,6 @@ fileInp.addEventListener("change", async () => {
 
   resetUI();
   fileLbl.textContent = file.name;
-  fileLblProgress.textContent = file.name;
 
   status.innerHTML = '<span class="loader"></span>Reading meta…';
 
@@ -154,6 +151,7 @@ sio.on("done", d => {
   status.appendChild(timerSpan);
   status.innerHTML += tg;
 
+  // Возвращаем UI в исходное состояние через 10 секунд
   setTimeout(() => {
     resetUI();
     status.textContent = 'Ready for next video.';
@@ -167,28 +165,18 @@ function resetUI() {
   convertBtn.disabled = true;
   fileInp.value = '';
   fileLbl.textContent = 'Choose video…';
-  fileLblProgress.textContent = 'Choose video…';
   progressBarFill.style.width = '0%';
-  progressTextContainer.style.width = '0%';
   status.textContent = '';
   if (statusTimer) clearInterval(statusTimer);
 }
 
 function resetProgress() {
-  const initialText = '0%';
-  fileLbl.textContent = initialText;
-  fileLblProgress.textContent = initialText;
+  fileLbl.textContent = '0%';
   progressBarFill.style.width = '0%';
-  progressTextContainer.style.width = '0%';
 }
 
 function updateProgress(v) {
   const pct = Math.min(100, v * 100);
-  const pctStr = `${Math.round(pct)}%`;
-
-  fileLbl.textContent = pctStr;
-  fileLblProgress.textContent = pctStr;
-
+  fileLbl.textContent = `${Math.round(pct)}%`;
   progressBarFill.style.width = `${pct}%`;
-  progressTextContainer.style.width = `${pct}%`;
 }
