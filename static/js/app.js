@@ -1,18 +1,10 @@
-/* mini‑$ selector */
-const $ = s => document.querySelector(s);
+/* mini‑$ selector */ const $ = s => document.querySelector(s);
+const fileInp = $("#file"), fileLbl = $("#fileLabel"), chevBtn = $("#chevron"),
+  advBlk = $("#advanced"), convert = $("#convert"), status = $("#status"),
+  bar = $("#bar"), pctTxt = $("#pct");
 
-const fileInp = $("#file"),
-  fileLbl = $("#fileLabel"),
-  chevBtn = $("#chevron"),
-  advBlk = $("#advanced"),
-  convert = $("#convert"),
-  status = $("#status"),
-  bar = $("#bar"),
-  pctTxt = $("#pct");
-
-fileInp.addEventListener("change", () =>
-  fileLbl.textContent = fileInp.files[0]?.name || "Choose video…"
-);
+fileInp.addEventListener("change",
+  () => fileLbl.textContent = fileInp.files[0]?.name || "Choose video…");
 
 chevBtn.addEventListener("click", () => {
   chevBtn.classList.toggle("open");
@@ -23,26 +15,17 @@ const bindRange = (inp, out) => {
   const i = $(inp), o = $(out);
   i.addEventListener("input", () => o.textContent = i.value);
 };
-bindRange("#size", "#sizeOut");
-bindRange("#duration", "#durOut");
-bindRange("#offset", "#offOut");
+bindRange("#size", "#sizeOut"); bindRange("#duration", "#durOut"); bindRange("#offset", "#offOut");
 
-const sio = io();   // Socket.IO client
+/* NEW → force pure WebSocket, no polling fallback */
+const sio = io({ transports: ["websocket"] });
 
-function resetProgress() {
-  bar.value = 0;
-  pctTxt.textContent = "0%";
-}
-function updatePct(v) {
-  bar.value = v;
-  pctTxt.textContent = Math.round(v * 100) + "%";
-}
+function resetProgress() { bar.value = 0; pctTxt.textContent = "0%"; }
+function updatePct(v) { bar.value = v; pctTxt.textContent = Math.round(v * 100) + "%"; }
 
 convert.addEventListener("click", async () => {
   if (!fileInp.files[0]) { status.textContent = "Select a file first."; return; }
-
-  status.textContent = "Uploading…";
-  resetProgress();
+  status.textContent = "Uploading…"; resetProgress();
 
   const fd = new FormData();
   fd.append("video", fileInp.files[0]);
@@ -58,7 +41,6 @@ convert.addEventListener("click", async () => {
     if (!r.ok) throw new Error(error || r.statusText);
 
     sio.emit("join", { job: job_id });
-
     let clipSec = $("#duration").value;
 
     sio.on("metadata", d => {
@@ -66,12 +48,10 @@ convert.addEventListener("click", async () => {
       $("#duration").max = Math.ceil(d.duration);
       clipSec = $("#duration").value;
     });
-
     sio.on("progress", d => {
       if (d.job !== job_id) return;
       updatePct(d.ms / (clipSec * 1000));
     });
-
     sio.on("done", d => {
       if (d.job !== job_id) return;
       updatePct(1);
@@ -81,7 +61,5 @@ convert.addEventListener("click", async () => {
 
     status.textContent = "Processing…";
 
-  } catch (e) {
-    status.textContent = "⚠️ " + e.message;
-  }
+  } catch (e) { status.textContent = "⚠️ " + e.message; }
 });
