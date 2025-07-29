@@ -23,6 +23,7 @@ body {
     justify-content: center;
     min-height: 100vh;
     color: var(--accent);
+    overflow-y: auto;
 }
 
 .card {
@@ -99,9 +100,9 @@ input[type=file] {
     height: 4px;
     background: var(--accent);
     transform-origin: center;
+    transition: transform .35s ease-in-out;
 }
 
-/* закрыто: угол вниз */
 .chevron span:first-child {
     transform: translateX(-10px) rotate(45deg);
 }
@@ -110,7 +111,6 @@ input[type=file] {
     transform: translateX(10px) rotate(-45deg);
 }
 
-/* открыто: угол вверх */
 .chevron.open span:first-child {
     transform: translateX(10px) rotate(45deg);
 }
@@ -119,19 +119,14 @@ input[type=file] {
     transform: translateX(-10px) rotate(-45deg);
 }
 
-.chevron span {
-    transition: transform .35s ease-in-out;
-}
-
 .advanced {
-    padding: 0.5rem;
+    padding: .5rem;
     overflow: hidden;
     max-height: 0;
     transition: max-height .6s cubic-bezier(.4, 0, .2, 1);
 }
 
 .advanced.open {
-    padding: 0.5rem;
     max-height: 350px;
 }
 
@@ -152,10 +147,10 @@ input[type=range] {
 
 input[type=text] {
     width: 100%;
-    padding: 0.8rem;
+    padding: .8rem;
     border: none;
     border-radius: 1rem;
-    margin-bottom: 0.8rem;
+    margin-bottom: .8rem;
     background: var(--bg);
     color: var(--accent);
     box-shadow: inset -6px -6px 12px var(--sh-light),
@@ -186,13 +181,22 @@ input[type=text] {
 
     .card {
         width: 100vw;
-        min-height: 100vh;
-        padding: 1.5rem 1.2rem 2rem;
+        min-height: 100svh;
+        min-height: 100dvh;
+        /* fallback for new browsers */
+        padding: 1.5rem 1.2rem calc(2rem + env(safe-area-inset-bottom));
         border-radius: 0;
         box-shadow: none;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
     }
 
     .chevron {
         margin: 1.4rem auto 0;
+    }
+
+    .result {
+        margin-top: auto;
     }
 }
