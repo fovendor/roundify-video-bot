@@ -33,17 +33,15 @@ fileInp.addEventListener("change", async () => {
 
     currentJobId = meta.job_id;
     sourceDuration = meta.duration;
-    clipSec = Math.min(60, sourceDuration); // Устанавливаем длительность по умолчанию, но не больше длины видео
+    clipSec = Math.min(60, sourceDuration);
 
-    // Обновляем UI с полученными метаданными
     updateSliders(sourceDuration, clipSec);
     status.textContent =
       `Duration: ${meta.duration.toFixed(1)} s | ` +
       `Res: ${meta.width}×${meta.height} | ` +
       `Size: ${meta.size_mb.toFixed(2)} MB`;
-    convertBtn.disabled = false; // Активируем кнопку конвертации
+    convertBtn.disabled = false;
 
-    // Подключаемся к сокету для будущего прогресса
     sio.emit("join", { job: currentJobId });
 
   } catch (e) {
@@ -101,51 +99,54 @@ function updateSliders(totalDuration, currentClipDuration) {
 durationSlider.addEventListener("input", () => {
   clipSec = +durationSlider.value;
   $("#durOut").textContent = clipSec;
-  // Корректируем максимальное смещение при изменении длительности
   offsetSlider.max = Math.max(0, Math.floor(sourceDuration - clipSec));
   if (+offsetSlider.value > +offsetSlider.max) {
-    offsetSlider.value = offsetSlider.max;
-    $("#offOut").textContent = offsetSlider.value;
+      offsetSlider.value = offsetSlider.max;
+      $("#offOut").textContent = offsetSlider.value;
   }
 });
 
 offsetSlider.addEventListener("input", () => {
-  $("#offOut").textContent = offsetSlider.value;
+    $("#offOut").textContent = offsetSlider.value;
 });
 
 sizeSlider.addEventListener("input", () => {
-  $("#sizeOut").textContent = sizeSlider.value;
+    $("#sizeOut").textContent = sizeSlider.value;
 });
-
 
 // --- WebSocket Logic ---
 
 const sio = io({ transports: ["websocket"], autoConnect: true });
 
 sio.on("connect", () => {
-  console.log("Socket.IO connected!");
+    console.log("Socket.IO connected!");
 });
 
 sio.on("progress", d => {
   if (d.job !== currentJobId) return;
   const progressValue = d.ms / (clipSec * 1000);
-  updatePct(Math.min(1, progressValue)); // Убедимся, что не превышает 100%
+  updatePct(Math.min(0.99, progressValue)); // Оставляем 100% для события "done"
+});
+
+sio.on("status_update", d => {
+    if (d.job !== currentJobId) return;
+    status.textContent = d.status;
 });
 
 sio.on("done", d => {
   if (d.job !== currentJobId) return;
-  updatePct(1);
+  updatePct(1); // Финальные 100%
   const tg = d.telegram ? " ↗️ sent to TG" : "";
   status.innerHTML = `Done — <a href="${d.download}" target="_blank">Download</a>${tg}`;
+  convertBtn.disabled = false; // Включаем кнопку обратно
   sio.emit("leave", { job: d.job });
-  currentJobId = null; // Сбрасываем ID задачи
+  currentJobId = null;
 });
 
 sio.on("connect_error", (err) => {
   console.error("Socket connection error:", err);
   status.textContent = "⚠️ WebSocket connection failed.";
 });
-
 
 // --- UI Helper Functions ---
 
@@ -162,6 +163,7 @@ function resetProgress() {
 }
 
 function updatePct(v) {
-  bar.value = v;
-  pctTxt.textContent = Math.round(v * 100) + "%";
+  const clampedValue = Math.min(1, v); // Убедимся, что значение не больше 1
+  bar.value = clampedValue;
+  pctTxt.textContent = Math.round(clampedValue * 100) + "%";
 }

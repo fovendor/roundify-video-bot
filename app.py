@@ -89,13 +89,21 @@ def run_ffmpeg(job_id: str, src: str, opts: dict):
             break
     proc.wait()
 
+    # Отправляем статус о завершении конвертации
+    socketio.emit("status_update", {"job": job_id, "status": "Finalizing..."}, to=job_id)
+
+    # ─── отправляем в TG если надо ───
     tg_ok = False
     if opts.get("token") and opts.get("chat"):
         if dst.exists() and dst.stat().st_size > 0:
+            # Отправляем статус об отправке в Telegram
+            socketio.emit("status_update", {"job": job_id, "status": "Sending to Telegram..."}, to=job_id)
             tg_ok = send_to_telegram(dst, opts["token"], opts["chat"])
         else:
             log.error(f"FFmpeg did not produce an output file for job {job_id}")
+            socketio.emit("status_update", {"job": job_id, "status": "Error: FFmpeg failed"}, to=job_id)
 
+    # Финальное событие "done"
     socketio.emit("done",
                   {"job": job_id,
                    "download": url_for('download', filename=dst.name, _external=True),
