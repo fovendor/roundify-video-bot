@@ -41,7 +41,6 @@ h1 {
     font-size: 1.4rem;
 }
 
-/* --- ИЗМЕНЕНИЯ: Простая и надежная структура --- */
 label.upload {
     position: relative;
     display: flex;
@@ -58,8 +57,18 @@ label.upload {
     overflow: hidden;
 }
 
+/* --- ИЗМЕНЕНИЕ --- */
 label.upload:hover {
     filter: brightness(.95);
+}
+
+label.upload.is-disabled {
+    cursor: default;
+    pointer-events: none;
+}
+
+label.upload.is-disabled:hover {
+    filter: none;
 }
 
 #progressBarFill {
@@ -83,10 +92,8 @@ label.upload:hover {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    /* Изначально текст всегда тёмный. JS будет управлять цветом. */
     color: var(--accent);
     transition: color 0.1s linear;
-    /* Плавный переход цвета */
 }
 
 input[type=file] {
@@ -211,16 +218,17 @@ input[type=text] {
     text-decoration: none;
 }
 
+/* --- ИЗМЕНЕНИЕ: Спиннер стал чуть больше, чтобы соответствовать размеру шрифта --- */
 .loader {
     display: inline-block;
-    width: 1em;
-    height: 1em;
+    width: 1.2em;
+    height: 1.2em;
     margin-right: .5em;
     border: .15em solid var(--accent);
     border-top-color: transparent;
     border-radius: 50%;
     animation: spin .9s linear infinite;
-    vertical-align: -.2em;
+    vertical-align: -.25em;
 }
 
 @keyframes spin {

@@ -1,6 +1,7 @@
 /* mini-$ selector */ const $ = s => document.querySelector(s);
 
 const fileInp = $("#file"),
+  uploadLabel = $("#uploadLabel"),
   fileLbl = $("#fileLabel"),
   progressBarFill = $("#progressBarFill"),
   chevBtn = $("#chevron"), advBlk = $("#advanced"), convertBtn = $("#convert"),
@@ -10,8 +11,8 @@ const fileInp = $("#file"),
 let currentJobId = null;
 let sourceDuration = 0;
 let clipSec = 60;
-let statusTimer = null; // Для таймера обратного отсчета
-let resetTimer = null;  // Для сброса UI
+let statusTimer = null;
+let resetTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => { convertBtn.disabled = true; });
 
@@ -20,9 +21,11 @@ fileInp.addEventListener("change", async () => {
   if (!file) { resetUI(); return; }
 
   resetUI();
-  fileLbl.textContent = file.name;
 
-  status.innerHTML = '<span class="loader"></span>Reading meta…';
+  // --- ИЗМЕНЕНИЕ: Отображаем спиннер внутри кнопки ---
+  uploadLabel.classList.add('is-disabled');
+  fileLbl.innerHTML = '<span class="loader"></span>';
+  status.textContent = ''; // Убираем старый текстовый статус
 
   const fd = new FormData();
   fd.append("video", file);
@@ -37,8 +40,11 @@ fileInp.addEventListener("change", async () => {
 
     updateSliders(sourceDuration, Math.min(parseInt(durationSlider.max, 10), sourceDuration));
 
-    status.textContent = `Duration: ${meta.duration.toFixed(1)}s | Res: ${meta.width}×${meta.height}`;
+    // --- ИЗМЕНЕНИЕ: Отображаем мету внутри кнопки ---
+    fileLbl.textContent = `${meta.duration.toFixed(1)}s | ${meta.width}×${meta.height} | ${meta.size_mb.toFixed(1)}MB`;
+
     convertBtn.disabled = false;
+    uploadLabel.classList.remove('is-disabled'); // Разрешаем выбрать другой файл
 
     sio.emit("join", { job: currentJobId });
 
@@ -54,6 +60,7 @@ convertBtn.addEventListener("click", async () => {
   resetProgress();
   status.textContent = "Processing…";
   convertBtn.disabled = true;
+  uploadLabel.classList.add('is-disabled'); // --- ИЗМЕНЕНИЕ ---
   clipSec = +durationSlider.value;
 
   const fd = new FormData();
@@ -72,6 +79,7 @@ convertBtn.addEventListener("click", async () => {
   } catch (e) {
     status.textContent = "⚠️ " + e.message;
     convertBtn.disabled = false;
+    uploadLabel.classList.remove('is-disabled'); // --- ИЗМЕНЕНИЕ ---
   }
 });
 
@@ -120,24 +128,26 @@ sio.on("done", d => {
   if (d.job !== currentJobId) return;
   updateProgress(1);
 
-  const tg = d.telegram ? " ↗️ Sent to TG" : "";
+  const tg = d.telegram ? " ↗️ Sent to TG" : ""; // Оставляем для возможного использования, но не показываем
+
+  // --- ИЗМЕНЕНИЕ: Новый формат финального статуса ---
   const downloadLink = document.createElement('a');
   downloadLink.href = d.download;
   downloadLink.target = "_blank";
-  downloadLink.textContent = "Download";
+  downloadLink.textContent = "Скачать видео";
 
   const timerSpan = document.createElement('span');
-  timerSpan.style.marginLeft = '10px';
+  timerSpan.style.marginLeft = '5px';
 
   let remainingTime = d.ttl;
   if (statusTimer) clearInterval(statusTimer);
 
   const updateTimer = () => {
     if (remainingTime > 0) {
-      timerSpan.textContent = `(expires in ${remainingTime}s)`;
+      timerSpan.textContent = `(ещё ${remainingTime}с)`;
       remainingTime--;
     } else {
-      timerSpan.textContent = "(expired)";
+      timerSpan.textContent = `(ссылка истекла)`;
       downloadLink.style.pointerEvents = "none";
       downloadLink.style.textDecoration = "line-through";
       clearInterval(statusTimer);
@@ -147,18 +157,16 @@ sio.on("done", d => {
   statusTimer = setInterval(updateTimer, 1000);
   updateTimer();
 
-  status.innerHTML = `Done — `;
+  status.innerHTML = ``; // Очищаем статус
   status.appendChild(downloadLink);
+  status.append(' можно ');
   status.appendChild(timerSpan);
-  status.innerHTML += tg;
 
-  // --- ИЗМЕНЕНИЕ ---
-  // Сбрасываем UI ровно через d.ttl секунд, синхронно с бэкендом
   if (resetTimer) clearTimeout(resetTimer);
   resetTimer = setTimeout(() => {
     resetUI();
-    status.textContent = 'Ready for next video.';
-  }, d.ttl * 1000);
+    // --- ИЗМЕНЕНИЕ: Убираем финальное сообщение ---
+  }, d.ttl * 1000 + 1000); // +1 секунда, чтобы пользователь увидел "ссылка истекла"
 
   sio.emit("leave", { job: d.job });
   currentJobId = null;
@@ -166,11 +174,12 @@ sio.on("done", d => {
 
 function resetUI() {
   convertBtn.disabled = true;
+  uploadLabel.classList.remove('is-disabled'); // --- ИЗМЕНЕНИЕ ---
   fileInp.value = '';
   fileLbl.textContent = 'Choose video…';
   fileLbl.style.color = '';
   progressBarFill.style.width = '0%';
-  status.textContent = '';
+  status.innerHTML = ''; // --- ИЗМЕНЕНИЕ ---
   if (statusTimer) clearInterval(statusTimer);
   if (resetTimer) clearTimeout(resetTimer);
 }
@@ -186,7 +195,7 @@ function updateProgress(v) {
   fileLbl.textContent = `${Math.round(pct)}%`;
   progressBarFill.style.width = `${pct}%`;
 
-  if (pct >= 47) { // Порог, который вы подобрали
+  if (pct >= 47) {
     fileLbl.style.color = '#fff';
   } else {
     fileLbl.style.color = 'var(--accent)';
