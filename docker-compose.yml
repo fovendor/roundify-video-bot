@@ -5,8 +5,8 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      ROUNDIFY_JOBS: 3
-      TTL_SECONDS: 90
+      ROUNDIFY_JOBS: 2
+      TTL_SECONDS: 60
     ports:
       - "127.0.0.1:8000:8000"
     networks:

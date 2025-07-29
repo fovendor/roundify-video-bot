@@ -23,7 +23,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 # ─────────────── settings ───────────────
 WORKERS = int(os.getenv("ROUNDIFY_JOBS", 2))
 TTL_SECONDS = int(os.getenv("TTL_SECONDS", 60))
-MAX_CLIP_SECONDS = int(os.getenv("MAX_CLIP_SECONDS", 60)) # Новая настройка
+MAX_CLIP_SECONDS = int(os.getenv("MAX_CLIP_SECONDS", 60))
 TMP = pl.Path(tempfile.gettempdir()) / "roundify_ws"
 TMP.mkdir(exist_ok=True)
 
@@ -68,29 +68,23 @@ def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
         return False
 
 # ───────── FFmpeg Background Task ─────
-def run_ffmpeg_and_notify(job_id: str, src_path_str: str, opts: dict):
+def run_ffmpeg_and_notify(job_id: str, src_path_str: str, dst_filename: str, download_url: str, opts: dict):
+    """Фоновая задача, которая НЕ вызывает url_for, а использует готовую ссылку."""
     src_path = pl.Path(src_path_str)
-    dst_path = TMP / f"{src_path.stem}_round.mp4"
+    dst_path = TMP / dst_filename
 
     try:
         vb = calc_video_bitrate(opts["max_mb"], opts["clip_sec"])
-        vf = (f"crop='min(iw\\,ih)':min(iw\\,ih),setsar=1,"
-              f"scale={opts['size']}:{opts['size']}")
+        vf = f"crop='min(iw\\,ih)':min(iw\\,ih),setsar=1,scale={opts['size']}:{opts['size']}"
 
         cmd = [
-            "ffmpeg", "-y",
-            "-ss", str(opts["offset"]),
-            "-t", str(opts["clip_sec"]),
-            "-i", str(src_path),
-            "-vf", vf,
-            "-c:v", "libx264", "-b:v", f"{vb}k",
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-            "-c:a", "aac", "-b:a", "128k",
-            "-progress", "pipe:1", "-f", "mp4", str(dst_path)
+            "ffmpeg", "-y", "-ss", str(opts["offset"]), "-t", str(opts["clip_sec"]),
+            "-i", str(src_path), "-vf", vf, "-c:v", "libx264", "-b:v", f"{vb}k",
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac",
+            "-b:a", "128k", "-progress", "pipe:1", "-f", "mp4", str(dst_path)
         ]
 
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL, text=True, encoding='utf-8')
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding='utf-8')
 
         for line in proc.stdout:
             if line.startswith("out_time_ms"):
@@ -109,20 +103,15 @@ def run_ffmpeg_and_notify(job_id: str, src_path_str: str, opts: dict):
                 socketio.emit("status_update", {"job": job_id, "status": "Sending to Telegram..."}, to=job_id)
                 tg_ok = send_to_telegram(dst_path, opts["token"], opts["chat"])
 
-        # ИЗМЕНЕНИЕ: Генерируем относительный URL, убрав _external=True
-        with app.app_context():
-            download_url = url_for('download', filename=dst_path.name)
-
         socketio.emit("done", {
             "job": job_id,
-            "download": download_url,
+            "download": download_url, # Используем готовую ссылку
             "telegram": tg_ok
         }, to=job_id)
 
     except Exception as e:
         log.error(f"Error in background task for job {job_id}: {e}")
-        with app.app_context():
-            socketio.emit("status_update", {"job": job_id, "status": f"Error: {e}"}, to=job_id)
+        socketio.emit("status_update", {"job": job_id, "status": f"Error: {e}"}, to=job_id)
 
     finally:
         if src_path.exists():
@@ -131,7 +120,6 @@ def run_ffmpeg_and_notify(job_id: str, src_path_str: str, opts: dict):
 # ───────────── routes ───────────────────
 @app.route("/")
 def index():
-    # Передаем MAX_CLIP_SECONDS в шаблон
     return render_template("index.html", max_clip_seconds=MAX_CLIP_SECONDS)
 
 @app.post("/api/upload")
@@ -152,23 +140,15 @@ def api_upload():
         tmp_in.unlink(missing_ok=True)
         return jsonify(error="Invalid video file"), 400
 
-    return jsonify(
-        job_id=job_id,
-        duration=meta["duration"],
-        width=meta["width"],
-        height=meta["height"],
-        size_mb=size_mb
-    )
+    return jsonify(job_id=job_id, duration=meta["duration"], width=meta["width"], height=meta["height"], size_mb=size_mb)
 
 @app.post("/api/convert")
 def api_convert():
     job_id = request.form.get("job_id")
     clip_duration = float(request.form.get("duration", 0))
 
-    # ИЗМЕНЕНИЕ: Проверка на максимальную длительность
     if clip_duration > MAX_CLIP_SECONDS:
         return jsonify(error=f"Duration cannot exceed {MAX_CLIP_SECONDS} seconds."), 400
-
     if not job_id:
         return jsonify(error="job_id missing"), 400
 
@@ -186,11 +166,17 @@ def api_convert():
         "token": request.form.get("token"),
         "chat": request.form.get("chat"),
     }
+    
+    # ИЗМЕНЕНИЕ: Генерируем имя файла и ссылку здесь, внутри контекста запроса
+    dst_filename = f"{tmp_in.stem}_round.mp4"
+    download_url = url_for('download', filename=dst_filename)
 
     socketio.start_background_task(
         run_ffmpeg_and_notify,
         job_id=job_id,
         src_path_str=str(tmp_in),
+        dst_filename=dst_filename,
+        download_url=download_url,
         opts=opts
     )
     return jsonify(status="ok", message="Conversion started")
