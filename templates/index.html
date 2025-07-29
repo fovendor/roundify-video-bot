@@ -1,17 +1,14 @@
 <!doctype html>
 <html lang="en">
-
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#d3d3d3">
   <title>Roundify</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}?v=2">
-  <!-- Socket.IO CDN -->
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
-
 <body>
   <main class="card">
     <h1>Roundify</h1>
@@ -20,6 +17,8 @@
       <input id="file" type="file" accept="video/*" hidden>
       <span id="fileLabel">Choose video…</span>
     </label>
+
+    <p id="status" class="result"></p>
 
     <button id="convert">Convert</button>
 
@@ -44,16 +43,13 @@
       </div>
 
       <input type="text" id="token" placeholder="Bot token">
-      <input type="text" id="chat" placeholder="@channel or chat‑id">
-      <p class="small">Fill both fields and the video will be sent to Telegram as a circular note.</p>
+      <input type="text" id="chat"  placeholder="@channel or chat-id">
+      <p class="small">Заполните оба поля — видео улетит в Telegram кружочком (≤ 50 MB).</p>
     </section>
 
     <progress id="bar" max="1" value="0"></progress>
     <span id="pct">0%</span>
-
-    <p class="result" id="status"></p>
   </main>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
-
 </html>

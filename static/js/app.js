@@ -1,10 +1,37 @@
 /* mini‑$ selector */ const $ = s => document.querySelector(s);
+
 const fileInp = $("#file"), fileLbl = $("#fileLabel"), chevBtn = $("#chevron"),
   advBlk = $("#advanced"), convert = $("#convert"), status = $("#status"),
   bar = $("#bar"), pctTxt = $("#pct");
 
-fileInp.addEventListener("change",
-  () => fileLbl.textContent = fileInp.files[0]?.name || "Choose video…");
+let clipSec = 60;      // актуальная длительность клипа
+
+fileInp.addEventListener("change", async () => {
+  fileLbl.textContent = fileInp.files[0]?.name || "Choose video…";
+  if (!fileInp.files[0]) return;
+
+  // ─── запрашиваем метаданные ───
+  status.innerHTML = '<span class="loader"></span>Reading meta…';
+  const fd = new FormData();
+  fd.append("video", fileInp.files[0]);
+
+  try {
+    const r = await fetch("/api/meta", { method: "POST", body: fd });
+    const meta = await r.json();
+    if (!r.ok) throw new Error(meta.error || r.statusText);
+
+    $("#duration").max = Math.ceil(meta.duration);
+    $("#offset").max = Math.floor(meta.duration);
+    clipSec = $("#duration").value;
+
+    status.textContent =
+      `Duration: ${meta.duration.toFixed(1)} s | ` +
+      `Resolution: ${meta.width}×${meta.height} | ` +
+      `Size: ${meta.size_mb.toFixed(2)} MB`;
+  } catch (e) {
+    status.textContent = "⚠️ " + e.message;
+  }
+});
 
 chevBtn.addEventListener("click", () => {
   chevBtn.classList.toggle("open");
@@ -13,11 +40,19 @@ chevBtn.addEventListener("click", () => {
 
 const bindRange = (inp, out) => {
   const i = $(inp), o = $(out);
-  i.addEventListener("input", () => o.textContent = i.value);
+  i.addEventListener("input", () => {
+    o.textContent = i.value;
+    if (inp === "#duration") {
+      clipSec = +i.value;
+      $("#offset").max = Math.max(0, $("#duration").max - clipSec);
+    }
+  });
 };
-bindRange("#size", "#sizeOut"); bindRange("#duration", "#durOut"); bindRange("#offset", "#offOut");
+bindRange("#size", "#sizeOut");
+bindRange("#duration", "#durOut");
+bindRange("#offset", "#offOut");
 
-/* NEW → force pure WebSocket, no polling fallback */
+/* force pure WebSocket */
 const sio = io({ transports: ["websocket"] });
 
 function resetProgress() { bar.value = 0; pctTxt.textContent = "0%"; }
@@ -41,21 +76,21 @@ convert.addEventListener("click", async () => {
     if (!r.ok) throw new Error(error || r.statusText);
 
     sio.emit("join", { job: job_id });
-    let clipSec = $("#duration").value;
 
-    sio.on("metadata", d => {
-      if (d.job !== job_id) return;
-      $("#duration").max = Math.ceil(d.duration);
-      clipSec = $("#duration").value;
+    sio.once("metadata", d => {              // пришло ещё раз, но не страшно
+      if (d.job === job_id) clipSec = $("#duration").value;
     });
+
     sio.on("progress", d => {
       if (d.job !== job_id) return;
       updatePct(d.ms / (clipSec * 1000));
     });
-    sio.on("done", d => {
+
+    sio.once("done", d => {
       if (d.job !== job_id) return;
       updatePct(1);
-      status.innerHTML = `Done — <a href="${d.download}">Download</a>`;
+      const tg = d.telegram ? " ↗️ sent&nbsp;to&nbsp;TG" : "";
+      status.innerHTML = `Done — <a href="${d.download}">Download</a>${tg}`;
       sio.emit("leave", { job: job_id });
     });
 
