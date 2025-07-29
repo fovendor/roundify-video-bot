@@ -41,7 +41,7 @@ h1 {
     font-size: 1.4rem;
 }
 
-/* --- ИЗМЕНЕНИЯ: Реализация через mix-blend-mode --- */
+/* --- ИЗМЕНЕНИЯ: Финальная реализация с переключением класса --- */
 label.upload {
     position: relative;
     display: flex;
@@ -83,14 +83,14 @@ label.upload:hover {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-
-    /* Магия! */
-    color: white;
-    /* Базовый цвет текста - белый */
-    mix-blend-mode: difference;
-    /* Инвертируем цвет относительно фона */
+    /* Изначально текст тёмный */
+    color: var(--accent);
 }
 
+#fileLabel.is-blending {
+    color: white;
+    mix-blend-mode: difference;
+}
 
 input[type=file] {
     display: none;

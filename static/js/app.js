@@ -151,7 +151,6 @@ sio.on("done", d => {
   status.appendChild(timerSpan);
   status.innerHTML += tg;
 
-  // Возвращаем UI в исходное состояние через 10 секунд
   setTimeout(() => {
     resetUI();
     status.textContent = 'Ready for next video.';
@@ -165,6 +164,7 @@ function resetUI() {
   convertBtn.disabled = true;
   fileInp.value = '';
   fileLbl.textContent = 'Choose video…';
+  fileLbl.classList.remove('is-blending'); // Убираем эффект
   progressBarFill.style.width = '0%';
   status.textContent = '';
   if (statusTimer) clearInterval(statusTimer);
@@ -172,6 +172,7 @@ function resetUI() {
 
 function resetProgress() {
   fileLbl.textContent = '0%';
+  fileLbl.classList.add('is-blending'); // Включаем эффект
   progressBarFill.style.width = '0%';
 }
 
