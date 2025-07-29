@@ -56,7 +56,7 @@ def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
 # ───────── FFmpeg Worker ─────
 def run_ffmpeg(job_id: str, src: str, opts: dict):
     src = pl.Path(src)
-    # Метаданные уже отправлены на фронт, но могут быть полезны для внутреннего использования
+    # Метаданные уже отправлены на фронт
     meta = ffprobe_meta(src)
     socketio.emit("metadata", {**meta, "size_mb": round(src.stat().st_size / 2**20, 2), "job": job_id}, to=job_id)
 
@@ -81,7 +81,8 @@ def run_ffmpeg(job_id: str, src: str, opts: dict):
     for line in proc.stdout:
         if line.startswith("out_time_ms"):
             try:
-                ms = int(line.strip().split("=")[1])
+                # ИЗМЕНЕНИЕ: Конвертируем микросекунды в миллисекунды
+                ms = int(line.strip().split("=")[1]) // 1000
                 socketio.emit("progress", {"job": job_id, "ms": ms}, to=job_id)
             except (ValueError, IndexError):
                 continue
@@ -89,21 +90,17 @@ def run_ffmpeg(job_id: str, src: str, opts: dict):
             break
     proc.wait()
 
-    # Отправляем статус о завершении конвертации
     socketio.emit("status_update", {"job": job_id, "status": "Finalizing..."}, to=job_id)
 
-    # ─── отправляем в TG если надо ───
     tg_ok = False
     if opts.get("token") and opts.get("chat"):
         if dst.exists() and dst.stat().st_size > 0:
-            # Отправляем статус об отправке в Telegram
             socketio.emit("status_update", {"job": job_id, "status": "Sending to Telegram..."}, to=job_id)
             tg_ok = send_to_telegram(dst, opts["token"], opts["chat"])
         else:
             log.error(f"FFmpeg did not produce an output file for job {job_id}")
             socketio.emit("status_update", {"job": job_id, "status": "Error: FFmpeg failed"}, to=job_id)
 
-    # Финальное событие "done"
     socketio.emit("done",
                   {"job": job_id,
                    "download": url_for('download', filename=dst.name, _external=True),

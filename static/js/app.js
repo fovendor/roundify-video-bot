@@ -33,9 +33,10 @@ fileInp.addEventListener("change", async () => {
 
     currentJobId = meta.job_id;
     sourceDuration = meta.duration;
-    clipSec = Math.min(60, sourceDuration);
+    // Используем актуальную длительность клипа из слайдера
+    clipSec = +durationSlider.value;
 
-    updateSliders(sourceDuration, clipSec);
+    updateSliders(sourceDuration, Math.min(60, sourceDuration));
     status.textContent =
       `Duration: ${meta.duration.toFixed(1)} s | ` +
       `Res: ${meta.width}×${meta.height} | ` +
@@ -59,6 +60,8 @@ convertBtn.addEventListener("click", async () => {
   status.textContent = "Processing…";
   resetProgress();
   convertBtn.disabled = true;
+  // Обновляем длительность клипа перед отправкой
+  clipSec = +durationSlider.value;
 
   const fd = new FormData();
   fd.append("job_id", currentJobId);
@@ -86,12 +89,13 @@ chevBtn.addEventListener("click", () => {
 
 // --- Sliders Logic ---
 
-function updateSliders(totalDuration, currentClipDuration) {
+function updateSliders(totalDuration, defaultClipDuration) {
   durationSlider.max = Math.ceil(totalDuration);
-  durationSlider.value = Math.ceil(currentClipDuration);
+  durationSlider.value = Math.ceil(defaultClipDuration);
   $("#durOut").textContent = durationSlider.value;
+  clipSec = defaultClipDuration;
 
-  offsetSlider.max = Math.floor(totalDuration - currentClipDuration);
+  offsetSlider.max = Math.floor(totalDuration - defaultClipDuration);
   offsetSlider.value = 0;
   $("#offOut").textContent = 0;
 }
@@ -118,14 +122,13 @@ sizeSlider.addEventListener("input", () => {
 
 const sio = io({ transports: ["websocket"], autoConnect: true });
 
-sio.on("connect", () => {
-    console.log("Socket.IO connected!");
-});
+sio.on("connect", () => console.log("Socket.IO connected!"));
 
 sio.on("progress", d => {
   if (d.job !== currentJobId) return;
+  // ИЗМЕНЕНИЕ: Теперь расчет корректный (миллисекунды / миллисекунды)
   const progressValue = d.ms / (clipSec * 1000);
-  updatePct(Math.min(0.99, progressValue)); // Оставляем 100% для события "done"
+  updatePct(progressValue);
 });
 
 sio.on("status_update", d => {
@@ -138,7 +141,7 @@ sio.on("done", d => {
   updatePct(1); // Финальные 100%
   const tg = d.telegram ? " ↗️ sent to TG" : "";
   status.innerHTML = `Done — <a href="${d.download}" target="_blank">Download</a>${tg}`;
-  convertBtn.disabled = false; // Включаем кнопку обратно
+  convertBtn.disabled = false;
   sio.emit("leave", { job: d.job });
   currentJobId = null;
 });
@@ -163,7 +166,7 @@ function resetProgress() {
 }
 
 function updatePct(v) {
-  const clampedValue = Math.min(1, v); // Убедимся, что значение не больше 1
+  const clampedValue = Math.min(1, Math.max(0, v)); // Гарантируем, что значение в диапазоне [0, 1]
   bar.value = clampedValue;
   pctTxt.textContent = Math.round(clampedValue * 100) + "%";
 }
