@@ -3,8 +3,8 @@
     --sh-dark: #b3b3b3;
     --sh-light: #f3f3f3;
     --accent: #0e2647;
-    /* Убираем полупрозрачность, делаем цвет сплошным */
-    --accent-fill: #0e2647;
+    /* ИЗМЕНЕНИЕ: Цвет для прогресс-бара, как у неактивной кнопки */
+    --progress-bar-fill: rgba(14, 38, 71, 0.65);
 }
 
 * {
@@ -42,70 +42,81 @@ h1 {
     font-size: 1.4rem
 }
 
-/* --- ИЗМЕНЕНИЯ: Стили для двухслойного текста и прогресс-бара --- */
+/* --- ИЗМЕНЕНИЯ: Полностью переработанный блок --- */
 label.upload {
     position: relative;
-    /* База для абсолютного позиционирования */
     display: flex;
     align-items: center;
     justify-content: center;
     padding: .9rem;
     border-radius: 1rem;
-    text-align: center;
     cursor: pointer;
     background: var(--bg);
     box-shadow: inset -6px -6px 12px var(--sh-light), inset 6px 6px 12px var(--sh-dark);
     user-select: none;
     margin-bottom: 1rem;
-    transition: filter .15s, background-size 0.2s ease-out;
+    transition: filter .15s;
     overflow: hidden;
-
-    /* Сплошной цвет заливки для прогресс-бара */
-    background-image: linear-gradient(to right, var(--accent-fill), var(--accent-fill));
-    background-repeat: no-repeat;
-    background-size: 0% 100%;
 }
 
 label.upload:hover {
     filter: brightness(.95)
 }
 
-#fileLabel {
-    color: var(--accent);
+#progressBarFill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 100%;
+    background-color: var(--progress-bar-fill);
+    transition: width 0.2s ease-out;
+    z-index: 1;
+}
+
+#progressText {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+}
+
+#fileLabel,
+#fileLabelProgress {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     font-variant-numeric: tabular-nums;
-    z-index: 1;
-    /* Нижний слой текста */
+    font-weight: 600;
+    /* Жирный шрифт */
 }
 
-/* Контейнер для верхнего (белого) слоя текста */
+#fileLabel {
+    color: var(--accent);
+}
+
 .progress-text-container {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 0%;
-    /* Начальная ширина 0, будет меняться через JS */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 0;
     height: 100%;
     overflow: hidden;
     transition: width 0.2s ease-out;
-    z-index: 2;
-    /* Верхний слой текста */
-}
-
-/* Верхний (белый) слой текста */
-#fileLabelProgress {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: clamp(320px, 90vw, 420px);
-    /* Фиксируем ширину равной родительской */
-    padding: .9rem;
-    /* Такой же padding для точного совпадения */
+}
+
+#fileLabelProgress {
     color: white;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    width: clamp(280px, 80vw, 380px);
+    /* Ширина, чтобы текст не прыгал */
+    text-align: center;
 }
 
 
@@ -132,6 +143,7 @@ input[type=file] {
 }
 
 #convert:disabled {
+    background: var(--accent);
     opacity: 0.6;
     cursor: not-allowed;
 }
@@ -266,7 +278,7 @@ input[type=text] {
     }
 
     #fileLabelProgress {
-        width: 100vw;
+        width: 85vw;
         /* Адаптируем под мобильную версию */
     }
 

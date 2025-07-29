@@ -1,9 +1,10 @@
 /* mini-$ selector */ const $ = s => document.querySelector(s);
 
 const fileInp = $("#file"),
-  fileLbl = $("#fileLabel"), // Нижний (темный) слой текста
-  fileLblProgress = $("#fileLabelProgress"), // Верхний (белый) слой текста
-  progressTextContainer = $(".progress-text-container"), // Контейнер для белого текста
+  fileLbl = $("#fileLabel"),
+  fileLblProgress = $("#fileLabelProgress"),
+  progressTextContainer = $(".progress-text-container"),
+  progressBarFill = $("#progressBarFill"),
   uploadLabel = $("#uploadLabel"),
   chevBtn = $("#chevron"), advBlk = $("#advanced"), convertBtn = $("#convert"),
   status = $("#status"), durationSlider = $("#duration"), offsetSlider = $("#offset"),
@@ -174,18 +175,19 @@ sio.on("done", d => {
 function resetUI() {
   convertBtn.disabled = true;
   fileInp.value = '';
-  uploadLabel.style.backgroundSize = '0% 100%';
   fileLbl.textContent = 'Choose video…';
-  fileLblProgress.textContent = '';
+  progressBarFill.style.width = '0%';
   progressTextContainer.style.width = '0%';
+  fileLblProgress.textContent = '';
   status.textContent = '';
   if (statusTimer) clearInterval(statusTimer);
 }
 
 function resetProgress() {
-  fileLbl.textContent = '0%';
-  fileLblProgress.textContent = '0%';
-  uploadLabel.style.backgroundSize = '0% 100%';
+  const initialText = '0%';
+  fileLbl.textContent = initialText;
+  fileLblProgress.textContent = initialText;
+  progressBarFill.style.width = '0%';
   progressTextContainer.style.width = '0%';
 }
 
@@ -193,11 +195,9 @@ function updateProgress(v) {
   const pct = Math.min(100, Math.round(v * 100));
   const pctStr = `${pct}%`;
 
-  // Обновляем оба слоя текста
   fileLbl.textContent = pctStr;
   fileLblProgress.textContent = pctStr;
 
-  // Обновляем фон и ширину контейнера белого текста
-  uploadLabel.style.backgroundSize = pctStr;
+  progressBarFill.style.width = pctStr;
   progressTextContainer.style.width = pctStr;
 }
