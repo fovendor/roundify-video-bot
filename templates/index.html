@@ -1,58 +1,60 @@
 <!doctype html>
 <html lang="ru">
+
 <head>
   <meta charset="utf-8">
-  <title>Roundify — Video-note maker</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#d3d3d3">
+
+  <title>Roundify</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-  <!-- favicon -->
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}?v=1">
 </head>
+
 <body>
 
-<main class="card">
-  <h1>Roundify</h1>
+  <main class="card">
+    <h1>Roundify</h1>
 
-  <!-- загрузка видео -->
-  <label class="upload" for="file">
-    <input id="file" type="file" accept="video/*" hidden>
-    <span id="fileLabel">Выберите видео…</span>
-  </label>
+    <label class="upload" for="file">
+      <input id="file" type="file" accept="video/*" hidden>
+      <span id="fileLabel">Выберите видео…</span>
+    </label>
 
-  <!-- кнопка Convert -->
-  <button id="convert">Convert</button>
+    <button id="convert">Convert</button>
 
-  <!-- стрелка-chevron -->
-  <button type="button" class="chevron" id="chevron" aria-label="Доп. настройки">
-    <span></span><span></span>
-  </button>
+    <button type="button" class="chevron" id="chevron" aria-label="Доп. настройки">
+      <span></span><span></span>
+    </button>
 
-  <!-- дополнительные параметры -->
-  <section class="advanced" id="advanced">
-    <div class="slider-wrap">
-      <label>Размер (px) <output id="sizeOut">640</output></label>
-      <input type="range" id="size" min="240" max="1024" step="16" value="640">
-    </div>
+    <section class="advanced" id="advanced">
+      <div class="slider-wrap">
+        <label>Размер (px) <output id="sizeOut">640</output></label>
+        <input type="range" id="size" min="240" max="1024" step="16" value="640">
+      </div>
 
-    <div class="slider-wrap">
-      <label>Длительность (с) <output id="durOut">60</output></label>
-      <input type="range" id="duration" min="1" max="60" value="60">
-    </div>
+      <div class="slider-wrap">
+        <label>Длительность (с) <output id="durOut">60</output></label>
+        <input type="range" id="duration" min="1" max="60" value="60">
+      </div>
 
-    <div class="slider-wrap">
-      <label>Сдвиг (с) <output id="offOut">0</output></label>
-      <input type="range" id="offset" min="0" max="600" value="0">
-    </div>
+      <div class="slider-wrap">
+        <label>Сдвиг начала видео (с) <output id="offOut">0</output></label>
+        <input type="range" id="offset" min="0" max="600" value="0">
+      </div>
 
-    <hr>
+      <input type="text" id="token" placeholder="Bot token">
+      <input type="text" id="chat" placeholder="@channel или chat-id">
+      <p class="small">Если заполнить оба поля — видео отправится кружочком в Telegram.</p>
+    </section>
 
-    <input type="text" id="token" placeholder="Bot token">
-    <input type="text" id="chat"  placeholder="@channel или chat-id">
-    <p class="small">Если заполнить оба поля — видео отправится кружочком в Telegram.</p>
-  </section>
+    <p class="result" id="status"></p>
+  </main>
 
-  <p class="result" id="status"></p>
-</main>
-
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
+
 </html>

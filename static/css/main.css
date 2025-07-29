@@ -10,6 +10,11 @@
     font-family: system-ui, sans-serif;
 }
 
+html,
+body {
+    height: 100%;
+}
+
 body {
     margin: 0;
     background: var(--bg);
@@ -20,7 +25,6 @@ body {
     color: var(--accent);
 }
 
-/* ── карточка ───────────────────────────── */
 .card {
     background: var(--bg);
     padding: 2rem;
@@ -35,7 +39,6 @@ h1 {
     font-size: 1.4rem;
 }
 
-/* ── загрузка файла ─────────────────────── */
 label.upload {
     display: block;
     padding: 0.9rem;
@@ -59,7 +62,6 @@ input[type=file] {
     display: none;
 }
 
-/* ── кнопка Convert ─────────────────────── */
 #convert {
     width: 100%;
     padding: 0.9rem;
@@ -78,7 +80,6 @@ input[type=file] {
     margin-bottom: 0;
 }
 
-/* ── стрелка-chevron ───────────────────── */
 .chevron {
     position: relative;
     display: block;
@@ -122,7 +123,6 @@ input[type=file] {
     transition: transform .35s ease-in-out;
 }
 
-/* ── блок доп. настроек ─────────────────── */
 .advanced {
     padding: 0.5rem;
     overflow: hidden;
@@ -150,7 +150,6 @@ input[type=range] {
     width: 100%;
 }
 
-/* ── текстовые поля ─────────────────────── */
 input[type=text] {
     width: 100%;
     padding: 0.8rem;
@@ -177,4 +176,23 @@ input[type=text] {
     color: var(--accent);
     font-weight: 600;
     text-decoration: none;
+}
+
+@media (max-width: 600px) {
+
+    body {
+        align-items: flex-start;
+    }
+
+    .card {
+        width: 100vw;
+        min-height: 100vh;
+        padding: 1.5rem 1.2rem 2rem;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .chevron {
+        margin: 1.4rem auto 0;
+    }
 }
