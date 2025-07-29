@@ -15,9 +15,13 @@
   <main class="card">
     <h1>Roundify</h1>
 
+    <!-- ИЗМЕНЕНИЕ: Добавлен span #fileLabelProgress для эффекта заливки текста -->
     <label class="upload" for="file" id="uploadLabel">
       <input id="file" type="file" accept="video/*" hidden>
       <span id="fileLabel">Choose video…</span>
+      <div class="progress-text-container">
+        <span id="fileLabelProgress"></span>
+      </div>
     </label>
 
     <button id="convert">Convert</button>
@@ -45,12 +49,10 @@
       <input type="text" id="token" placeholder="Bot token">
       <input type="text" id="chat" placeholder="@channel or chat-id">
 
-      <!-- ИЗМЕНЕНИЕ: Блок статуса перемещен сюда -->
       <p class="small">Заполните оба поля — видео улетит в Telegram кружочком (≤ 50 MB).</p>
       <p id="status" class="result"></p>
     </section>
 
-    <!-- Старый прогресс-бар удален -->
   </main>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

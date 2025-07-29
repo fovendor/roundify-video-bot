@@ -1,6 +1,10 @@
 /* mini-$ selector */ const $ = s => document.querySelector(s);
 
-const fileInp = $("#file"), fileLbl = $("#fileLabel"), uploadLabel = $("#uploadLabel"),
+const fileInp = $("#file"),
+  fileLbl = $("#fileLabel"), // Нижний (темный) слой текста
+  fileLblProgress = $("#fileLabelProgress"), // Верхний (белый) слой текста
+  progressTextContainer = $(".progress-text-container"), // Контейнер для белого текста
+  uploadLabel = $("#uploadLabel"),
   chevBtn = $("#chevron"), advBlk = $("#advanced"), convertBtn = $("#convert"),
   status = $("#status"), durationSlider = $("#duration"), offsetSlider = $("#offset"),
   sizeSlider = $("#size"), tokenInp = $("#token"), chatInp = $("#chat");
@@ -8,15 +12,11 @@ const fileInp = $("#file"), fileLbl = $("#fileLabel"), uploadLabel = $("#uploadL
 let currentJobId = null;
 let sourceDuration = 0;
 let clipSec = 60;
-let statusTimer = null; // Для таймера TTL
+let statusTimer = null;
 
-// --- Инициализация ---
 document.addEventListener('DOMContentLoaded', () => {
-  convertBtn.disabled = true; // Кнопка "Convert" неактивна при старте
+  convertBtn.disabled = true;
 });
-
-
-// --- Event Listeners ---
 
 fileInp.addEventListener("change", async () => {
   const file = fileInp.files[0];
@@ -25,12 +25,10 @@ fileInp.addEventListener("change", async () => {
     return;
   }
 
+  resetUI();
   fileLbl.textContent = file.name;
-  fileLbl.style.fontWeight = 'normal';
-  uploadLabel.style.backgroundSize = '0% 100%';
 
   status.innerHTML = '<span class="loader"></span>Reading meta…';
-  convertBtn.disabled = true;
 
   const fd = new FormData();
   fd.append("video", file);
@@ -63,7 +61,7 @@ convertBtn.addEventListener("click", async () => {
   }
 
   resetProgress();
-  status.textContent = "Uploading & processing…";
+  status.textContent = "Processing…";
   convertBtn.disabled = true;
   clipSec = +durationSlider.value;
 
@@ -91,8 +89,6 @@ chevBtn.addEventListener("click", () => {
   advBlk.classList.toggle("open");
 });
 
-// --- Sliders Logic ---
-
 function updateSliders(totalDuration, defaultClipDuration) {
   durationSlider.max = Math.ceil(Math.min(totalDuration, parseInt(durationSlider.max, 10)));
   durationSlider.value = Math.ceil(defaultClipDuration);
@@ -117,8 +113,6 @@ durationSlider.addEventListener("input", () => {
 offsetSlider.addEventListener("input", () => $("#offOut").textContent = offsetSlider.value);
 sizeSlider.addEventListener("input", () => $("#sizeOut").textContent = sizeSlider.value);
 
-// --- WebSocket Logic ---
-
 const sio = io({ transports: ["websocket"], autoConnect: true });
 
 sio.on("progress", d => {
@@ -134,10 +128,9 @@ sio.on("status_update", d => {
 
 sio.on("done", d => {
   if (d.job !== currentJobId) return;
-  updateProgress(1); // Финальные 100%
+  updateProgress(1);
 
   const tg = d.telegram ? " ↗️ Sent to TG" : "";
-
   const downloadLink = document.createElement('a');
   downloadLink.href = d.download;
   downloadLink.target = "_blank";
@@ -172,32 +165,39 @@ sio.on("done", d => {
   setTimeout(() => {
     resetUI();
     status.textContent = 'Ready for next video.';
-  }, 5000);
+  }, 10000);
 
   sio.emit("leave", { job: d.job });
   currentJobId = null;
 });
 
-// --- UI Helper Functions ---
-
 function resetUI() {
   convertBtn.disabled = true;
-  fileInp.value = ''; // Сбрасываем выбранный файл
+  fileInp.value = '';
   uploadLabel.style.backgroundSize = '0% 100%';
   fileLbl.textContent = 'Choose video…';
-  fileLbl.style.fontWeight = 'normal';
+  fileLblProgress.textContent = '';
+  progressTextContainer.style.width = '0%';
   status.textContent = '';
   if (statusTimer) clearInterval(statusTimer);
 }
 
 function resetProgress() {
-  uploadLabel.style.backgroundSize = '0% 100%';
   fileLbl.textContent = '0%';
-  fileLbl.style.fontWeight = 'bold';
+  fileLblProgress.textContent = '0%';
+  uploadLabel.style.backgroundSize = '0% 100%';
+  progressTextContainer.style.width = '0%';
 }
 
 function updateProgress(v) {
   const pct = Math.min(100, Math.round(v * 100));
-  uploadLabel.style.backgroundSize = `${pct}% 100%`;
-  fileLbl.textContent = `${pct}%`;
+  const pctStr = `${pct}%`;
+
+  // Обновляем оба слоя текста
+  fileLbl.textContent = pctStr;
+  fileLblProgress.textContent = pctStr;
+
+  // Обновляем фон и ширину контейнера белого текста
+  uploadLabel.style.backgroundSize = pctStr;
+  progressTextContainer.style.width = pctStr;
 }

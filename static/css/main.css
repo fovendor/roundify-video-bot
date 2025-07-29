@@ -3,8 +3,8 @@
     --sh-dark: #b3b3b3;
     --sh-light: #f3f3f3;
     --accent: #0e2647;
-    --accent-transp: rgba(14, 38, 71, 0.4);
-    /* Полупрозрачный цвет для прогресс-бара */
+    /* Убираем полупрозрачность, делаем цвет сплошным */
+    --accent-fill: #0e2647;
 }
 
 * {
@@ -42,10 +42,11 @@ h1 {
     font-size: 1.4rem
 }
 
-/* --- ИЗМЕНЕНИЕ: Стили для кнопки-прогресс-бара --- */
+/* --- ИЗМЕНЕНИЯ: Стили для двухслойного текста и прогресс-бара --- */
 label.upload {
+    position: relative;
+    /* База для абсолютного позиционирования */
     display: flex;
-    /* Для центрирования текста */
     align-items: center;
     justify-content: center;
     padding: .9rem;
@@ -56,21 +57,13 @@ label.upload {
     box-shadow: inset -6px -6px 12px var(--sh-light), inset 6px 6px 12px var(--sh-dark);
     user-select: none;
     margin-bottom: 1rem;
-    color: var(--accent);
     transition: filter .15s, background-size 0.2s ease-out;
-    /* Добавлена анимация для фона */
     overflow: hidden;
-    /* Обрезаем текст, который может вылезти */
-    white-space: nowrap;
-    /* Запрещаем перенос строки для имени файла */
-    text-overflow: ellipsis;
-    /* Добавляем многоточие если имя файла длинное */
 
-    /* Стили для градиента, который будет нашим прогресс-баром */
-    background-image: linear-gradient(to right, var(--accent-transp), var(--accent-transp));
+    /* Сплошной цвет заливки для прогресс-бара */
+    background-image: linear-gradient(to right, var(--accent-fill), var(--accent-fill));
     background-repeat: no-repeat;
     background-size: 0% 100%;
-    /* Начальное состояние - 0% ширины */
 }
 
 label.upload:hover {
@@ -78,8 +71,41 @@ label.upload:hover {
 }
 
 #fileLabel {
+    color: var(--accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-variant-numeric: tabular-nums;
-    /* Цифры процентов не "прыгают" */
+    z-index: 1;
+    /* Нижний слой текста */
+}
+
+/* Контейнер для верхнего (белого) слоя текста */
+.progress-text-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0%;
+    /* Начальная ширина 0, будет меняться через JS */
+    height: 100%;
+    overflow: hidden;
+    transition: width 0.2s ease-out;
+    z-index: 2;
+    /* Верхний слой текста */
+}
+
+/* Верхний (белый) слой текста */
+#fileLabelProgress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(320px, 90vw, 420px);
+    /* Фиксируем ширину равной родительской */
+    padding: .9rem;
+    /* Такой же padding для точного совпадения */
+    color: white;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 
@@ -196,7 +222,6 @@ input[type=text] {
     text-align: center;
     margin-top: 1rem;
     min-height: 1.2rem;
-    /* Резервируем место, чтобы верстка не прыгала */
 }
 
 .result a {
@@ -238,6 +263,11 @@ input[type=text] {
         overflow-y: auto;
         display: flex;
         flex-direction: column;
+    }
+
+    #fileLabelProgress {
+        width: 100vw;
+        /* Адаптируем под мобильную версию */
     }
 
     .chevron {
