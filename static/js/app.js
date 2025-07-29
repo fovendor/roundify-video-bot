@@ -39,7 +39,7 @@ fileInp.addEventListener("change", async () => {
 
     updateSliders(sourceDuration, Math.min(parseInt(durationSlider.max, 10), sourceDuration));
 
-    fileLbl.textContent = `${meta.duration.toFixed(1)}s | ${meta.width}×${meta.height} | ${meta.size_mb.toFixed(1)}MB`;
+    fileLbl.textContent = `${meta.duration.toFixed(1)}сек | ${meta.width}×${meta.height} | ${meta.size_mb.toFixed(1)}MB`;
 
     convertBtn.disabled = false;
     uploadLabel.classList.remove('is-disabled');
@@ -56,7 +56,6 @@ convertBtn.addEventListener("click", async () => {
   if (!currentJobId) { status.textContent = "Please select a file first."; return; }
 
   resetProgress();
-  // --- ИЗМЕНЕНИЕ: Убираем текстовый статус ---
   status.textContent = "";
   convertBtn.disabled = true;
   uploadLabel.classList.add('is-disabled');
@@ -120,7 +119,6 @@ sio.on("progress", d => {
 
 sio.on("status_update", d => {
   if (d.job !== currentJobId) return;
-  // --- ИЗМЕНЕНИЕ: Не показываем промежуточные статусы ---
   // status.textContent = d.status;
 });
 
@@ -134,7 +132,6 @@ sio.on("done", d => {
   downloadLink.textContent = "Скачать видео";
 
   const timerSpan = document.createElement('span');
-  // --- ИЗМЕНЕНИЕ ---
   timerSpan.style.marginLeft = '1px';
 
   let remainingTime = d.ttl;
@@ -142,7 +139,6 @@ sio.on("done", d => {
 
   const updateTimer = () => {
     if (remainingTime > 0) {
-      // --- ИЗМЕНЕНИЕ ---
       timerSpan.textContent = `ещё: ${remainingTime}с`;
       remainingTime--;
     } else {
@@ -174,7 +170,7 @@ function resetUI() {
   convertBtn.disabled = true;
   uploadLabel.classList.remove('is-disabled');
   fileInp.value = '';
-  fileLbl.textContent = 'Choose video…';
+  fileLbl.textContent = 'Загрузить видео...';
   fileLbl.style.color = '';
   progressBarFill.style.width = '0%';
   status.innerHTML = '';

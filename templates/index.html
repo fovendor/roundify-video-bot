@@ -15,14 +15,13 @@
   <main class="card">
     <h1>Roundify</h1>
 
-    <!-- ИЗМЕНЕНИЕ: Финальная, простая структура для mix-blend-mode -->
     <label class="upload" for="file" id="uploadLabel">
       <input id="file" type="file" accept="video/*" hidden>
       <div id="progressBarFill"></div>
-      <span id="fileLabel">Choose video…</span>
+      <span id="fileLabel">Загрузить видео...</span>
     </label>
 
-    <button id="convert">Convert</button>
+    <button id="convert">Конвертировать</button>
 
     <button type="button" class="chevron" id="chevron" aria-label="Advanced">
       <span></span><span></span>
@@ -30,24 +29,24 @@
 
     <section class="advanced" id="advanced">
       <div class="slider-wrap">
-        <label>Size (px) <output id="sizeOut">640</output></label>
+        <label>Размер (px) <output id="sizeOut">640</output></label>
         <input type="range" id="size" min="240" max="1024" step="16" value="640">
       </div>
 
       <div class="slider-wrap">
-        <label>Duration (s) <output id="durOut">60</output></label>
+        <label>Длительность (сек) <output id="durOut">60</output></label>
         <input type="range" id="duration" min="1" max="{{ max_clip_seconds }}" value="{{ max_clip_seconds }}">
       </div>
 
       <div class="slider-wrap">
-        <label>Offset (s) <output id="offOut">0</output></label>
+        <label>Смещение начала видео (сек) <output id="offOut">0</output></label>
         <input type="range" id="offset" min="0" max="600" value="0">
       </div>
 
       <input type="text" id="token" placeholder="Bot token">
       <input type="text" id="chat" placeholder="@channel or chat-id">
 
-      <p class="small">Заполните оба поля — видео улетит в Telegram кружочком (≤ 50 MB).</p>
+      <p class="small">Заполните оба поля для отправки кружочка в Telegram.</p>
       <p id="status" class="result"></p>
     </section>
 

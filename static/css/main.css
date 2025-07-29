@@ -57,7 +57,6 @@ label.upload {
     overflow: hidden;
 }
 
-/* --- ИЗМЕНЕНИЕ --- */
 label.upload:hover {
     filter: brightness(.95);
 }
@@ -80,13 +79,11 @@ label.upload.is-disabled:hover {
     background-color: var(--progress-bar-fill);
     transition: width 0.1s ease-out;
     z-index: 1;
-    /* Фон под текстом */
 }
 
 #fileLabel {
     position: relative;
     z-index: 2;
-    /* Текст над фоном */
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     white-space: nowrap;
@@ -218,7 +215,6 @@ input[type=text] {
     text-decoration: none;
 }
 
-/* --- ИЗМЕНЕНИЕ: Спиннер стал чуть больше, чтобы соответствовать размеру шрифта --- */
 .loader {
     display: inline-block;
     width: 1.2em;

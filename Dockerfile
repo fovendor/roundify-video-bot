@@ -16,7 +16,6 @@ COPY . .
 
 ENV ROUNDIFY_JOBS=3
 ENV TTL_SECONDS=60
-# ← один eventlet‑воркер, без --preload
 ENV GUNICORN_CMD_ARGS="--worker-tmp-dir /dev/shm --workers 1 --timeout 300"
 
 EXPOSE 8000

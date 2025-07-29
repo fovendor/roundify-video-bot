@@ -3,15 +3,18 @@ version: "3.9"
 services:
   roundify:
     build: .
+    image: roundify-img
+    container_name: roundify
     restart: unless-stopped
     environment:
       ROUNDIFY_JOBS: 2
       TTL_SECONDS: 60
+      MAX_CLIP_SECONDS: 60
     ports:
       - "127.0.0.1:8000:8000"
     networks:
       roundify_net:
-        ipv4_address: 10.77.0.10   # static IP опционально
+        ipv4_address: 10.77.0.10
 
 networks:
   roundify_net:

@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Roundify‑WS — video‑to‑circle converter with real‑time WebSocket progress
-и авто‑отправкой в Telegram + авто‑TTL‑очисткой.
-"""
+
 from __future__ import annotations
 import json
 import logging
@@ -102,8 +99,6 @@ def run_ffmpeg_and_notify(job_id: str, src_path_str: str, dst_filename: str, dow
                 socketio.emit("status_update", {"job": job_id, "status": "Sending to Telegram..."}, to=job_id)
                 tg_ok = send_to_telegram(dst_path, opts["token"], opts["chat"])
 
-        # --- ИЗМЕНЕНИЕ ---
-        # Добавляем TTL в финальное событие
         socketio.emit("done", {
             "job": job_id,
             "download": download_url,
