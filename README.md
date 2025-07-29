@@ -29,14 +29,14 @@ graph LR
         D[FFmpeg Background Task]
     end
 
-    A -- "1. POST /api/upload (file)" --> B
-    B -- "2. Response: {job_id, meta}" --> A
-    A -- "3. WebSocket connect & join" --> C
-    A -- "4. POST /api/convert (job_id)" --> B
-    B -- "5. Starts background task" --> D
-    D -- "6. emit progress" --> C
-    C -- "7. Forwards events to client" --> A
-    D -- "8. emit done" --> C
+    A -- "`(1) POST /api/upload (file)`" --> B
+    B -- "`(2) Response: {job_id, meta}`" --> A
+    A -- "`(3) WebSocket connect & join`" --> C
+    A -- "`(4) POST /api/convert (job_id)`" --> B
+    B -- "`(5) Starts background task`" --> D
+    D -- "`(6) emit progress`" --> C
+    C -- "`(7) Forwards events to client`" --> A
+    D -- "`(8) emit done`" --> C
 ```
 
 ## Deployment
