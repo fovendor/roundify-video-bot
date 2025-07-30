@@ -18,6 +18,7 @@ from flask import (Flask, jsonify, render_template, request,
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 # ─────────────── settings ───────────────
+WORKERS = int(os.getenv("ROUNDIFY_JOBS", 2))
 TTL_SECONDS = int(os.getenv("TTL_SECONDS", 60))
 MAX_CLIP_SECONDS = int(os.getenv("MAX_CLIP_SECONDS", 60))
 TMP = pl.Path(tempfile.gettempdir()) / "roundify_ws"
