@@ -18,7 +18,6 @@ from flask import (Flask, jsonify, render_template, request,
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 # ─────────────── settings ───────────────
-WORKERS = int(os.getenv("ROUNDIFY_JOBS", 2))
 TTL_SECONDS = int(os.getenv("TTL_SECONDS", 60))
 MAX_CLIP_SECONDS = int(os.getenv("MAX_CLIP_SECONDS", 60))
 TMP = pl.Path(tempfile.gettempdir()) / "roundify_ws"
@@ -91,7 +90,10 @@ def run_ffmpeg_and_notify(job_id: str, src_path_str: str, dst_filename: str, dow
                     continue
         proc.wait()
 
-        socketio.emit("status_update", {"job": job_id, "status": "Finalizing..."}, to=job_id)
+        socketio.emit("status_update", {
+            "job": job_id,
+            "status": "An error occurred during conversion."
+        }, to=job_id)
 
         tg_ok = False
         if opts.get("token") and opts.get("chat"):

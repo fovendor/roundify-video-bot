@@ -39,7 +39,7 @@ fileInp.addEventListener("change", async () => {
 
     updateSliders(sourceDuration, Math.min(parseInt(durationSlider.max, 10), sourceDuration));
 
-    fileLbl.textContent = `${meta.duration.toFixed(1)}сек | ${meta.width}×${meta.height} | ${meta.size_mb.toFixed(1)}MB`;
+    fileLbl.textContent = `${meta.duration.toFixed(1)} сек | ${meta.width}×${meta.height} | ${meta.size_mb.toFixed(1)}MB`;
 
     convertBtn.disabled = false;
     uploadLabel.classList.remove('is-disabled');
