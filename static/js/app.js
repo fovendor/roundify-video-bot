@@ -119,7 +119,7 @@ sio.on("progress", d => {
 
 sio.on("status_update", d => {
   if (d.job !== currentJobId) return;
-  // status.textContent = d.status;
+  status.textContent = d.status;
 });
 
 sio.on("done", d => {

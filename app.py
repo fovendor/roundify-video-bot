@@ -11,6 +11,7 @@ import threading
 import time
 import uuid
 from typing import Any, Dict
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 from flask import (Flask, jsonify, render_template, request,
@@ -21,6 +22,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 WORKERS = int(os.getenv("ROUNDIFY_JOBS", 2))
 TTL_SECONDS = int(os.getenv("TTL_SECONDS", 60))
 MAX_CLIP_SECONDS = int(os.getenv("MAX_CLIP_SECONDS", 60))
+executor = ThreadPoolExecutor(max_workers=WORKERS)
 TMP = pl.Path(tempfile.gettempdir()) / "roundify_ws"
 TMP.mkdir(exist_ok=True)
 
@@ -66,6 +68,7 @@ def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
 
 # ───────── FFmpeg Background Task ─────
 def run_ffmpeg_and_notify(job_id: str, src_path_str: str, dst_filename: str, download_url: str, opts: dict):
+    socketio.emit("status_update", {"job": job_id, "status": "Обработка..."}, to=job_id)
     src_path = pl.Path(src_path_str)
     dst_path = TMP / dst_filename
 
@@ -91,15 +94,12 @@ def run_ffmpeg_and_notify(job_id: str, src_path_str: str, dst_filename: str, dow
                     continue
         proc.wait()
 
-        socketio.emit("status_update", {
-            "job": job_id,
-            "status": "An error occurred during conversion."
-        }, to=job_id)
+        socketio.emit("status_update", {"job": job_id, "status": "Финализация..."}, to=job_id)
 
         tg_ok = False
         if opts.get("token") and opts.get("chat"):
             if dst_path.exists() and dst_path.stat().st_size > 0:
-                socketio.emit("status_update", {"job": job_id, "status": "Sending to Telegram..."}, to=job_id)
+                socketio.emit("status_update", {"job": job_id, "status": "Отправка в Telegram..."}, to=job_id)
                 tg_ok = send_to_telegram(dst_path, opts["token"], opts["chat"])
 
         socketio.emit("done", {
@@ -111,7 +111,7 @@ def run_ffmpeg_and_notify(job_id: str, src_path_str: str, dst_filename: str, dow
 
     except Exception as e:
         log.error(f"Error in background task for job {job_id}: {e}")
-        socketio.emit("status_update", {"job": job_id, "status": f"Error: {e}"}, to=job_id)
+        socketio.emit("status_update", {"job": job_id, "status": "Ошибка во время конвертации."}, to=job_id)
 
     finally:
         if src_path.exists():
@@ -168,9 +168,9 @@ def api_convert():
     }
     
     dst_filename = f"{tmp_in.stem}_round.mp4"
-    download_url = url_for('download', filename=dst_filename)
+    download_url = url_for('download', filename=dst_filename, _external=True)
 
-    socketio.start_background_task(
+    executor.submit(
         run_ffmpeg_and_notify,
         job_id=job_id,
         src_path_str=str(tmp_in),
@@ -178,7 +178,9 @@ def api_convert():
         download_url=download_url,
         opts=opts
     )
-    return jsonify(status="ok", message="Conversion started")
+
+    socketio.emit("status_update", {"job": job_id, "status": "В очереди..."}, to=job_id)
+    return jsonify(status="ok", message="Conversion queued")
 
 @socketio.on("join")
 def on_join(data):
