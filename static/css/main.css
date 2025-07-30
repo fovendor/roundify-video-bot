@@ -227,6 +227,12 @@ input[type=text] {
     vertical-align: -.25em;
 }
 
+#fileLabel,
+#status,
+#convert {
+  font-size: 14px; /* или другое значение, например 1rem */
+}
+
 @keyframes spin {
     to {
         transform: rotate(360deg);
