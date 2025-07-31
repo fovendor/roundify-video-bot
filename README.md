@@ -133,26 +133,34 @@ server {
     client_max_body_size 600M;
 
     location / {
-        proxy_pass         http://127.0.0.1:8000;
-        proxy_set_header   Host $host;
-        proxy_set_header   X-Real-IP $remote_addr;
-        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 
-        # Important for WebSocket to work
         proxy_http_version 1.1;
         proxy_set_header   Upgrade $http_upgrade;
         proxy_set_header   Connection "upgrade";
 
-        proxy_buffering    off;
+        proxy_buffering off;
         proxy_read_timeout 300s;
         proxy_connect_timeout 300s;
     }
 
-    # This block is usually generated automatically by Certbot
-    listen 443 ssl;
+    listen 443 ssl;                                   # managed by Certbot
     ssl_certificate     /etc/letsencrypt/live/roundipy.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/roundipy.example.com/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    if ($host = roundipy.example.com) {
+        return 301 https://$host$request_uri;
+    }
+    listen 80;
+    server_name roundipy.example.com;
+    return 404;                                       # managed by Certbot
 }
 ```
 
