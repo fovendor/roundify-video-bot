@@ -1,46 +1,54 @@
 #!/usr/bin/env python3
 
 from __future__ import annotations
+import asyncio
 import json
 import logging
 import os
 import pathlib as pl
-import subprocess
 import tempfile
-import threading
 import time
 import uuid
 from typing import Any, Dict
-from concurrent.futures import ThreadPoolExecutor
 
-import requests
-from flask import (Flask, jsonify, render_template, request,
-                   send_from_directory, url_for)
-from flask_socketio import SocketIO, emit, join_room, leave_room
+import aiofiles
+import httpx
+from fastapi import (FastAPI, File, Form, HTTPException, Request, UploadFile,
+                     WebSocket, WebSocketDisconnect)
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 # ─────────────── settings ───────────────
 WORKERS = int(os.getenv("ROUNDIFY_JOBS", 2))
+ffmpeg_semaphore = asyncio.Semaphore(WORKERS)
+
 TTL_SECONDS = int(os.getenv("TTL_SECONDS", 60))
 MAX_CLIP_SECONDS = int(os.getenv("MAX_CLIP_SECONDS", 60))
-executor = ThreadPoolExecutor(max_workers=WORKERS)
 TMP = pl.Path(tempfile.gettempdir()) / "roundify_ws"
 TMP.mkdir(exist_ok=True)
 
-# ────────── Flask / Socket.IO ───────────
-app = Flask(__name__, static_folder="static", template_folder="templates")
-socketio = SocketIO(app, cors_allowed_origins="*")
+# ────────── FastAPI ───────────
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 log = logging.getLogger("roundify")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
+
 # ───────────── helpers ──────────────────
-def ffprobe_meta(path: pl.Path) -> Dict[str, Any]:
+async def ffprobe_meta(path: pl.Path) -> Dict[str, Any]:
     cmd = [
         "ffprobe", "-v", "error", "-select_streams", "v:0",
         "-show_entries", "stream=width,height", "-show_entries", "format=duration",
         "-print_format", "json", str(path)
     ]
-    meta = json.loads(subprocess.check_output(cmd))
+    proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"ffprobe failed: {stderr.decode()}")
+    meta = json.loads(stdout)
     return {
         "duration": float(meta["format"]["duration"]),
         "width": int(meta["streams"][0]["width"]),
@@ -54,160 +62,184 @@ def calc_video_bitrate(max_mb: int, clip_sec: float, audio_kbps: int = 128) -> i
     return max(200, total_kbps - audio_kbps)
 
 # ───────── Telegram ──────────
-def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
+async def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
     url = f"https://api.telegram.org/bot{token}/sendVideoNote"
     try:
-        with path.open("rb") as f:
-            r = requests.post(url, data={"chat_id": chat}, files={"video_note": f}, timeout=120)
-        if not r.ok:
+        async with aiofiles.open(path, "rb") as f:
+            content = await f.read()
+
+        async with httpx.AsyncClient(timeout=120) as client:
+            files = {"video_note": (path.name, content, "video/mp4")}
+            data = {"chat_id": chat}
+            r = await client.post(url, data=data, files=files)
+            
+        if not r.is_success:
             log.warning("Telegram error %s – %s", r.status_code, r.text)
-        return r.ok
-    except requests.RequestException as e:
+        return r.is_success
+    except httpx.RequestError as e:
         log.error(f"Failed to send to Telegram: {e}")
         return False
 
 # ───────── FFmpeg Background Task ─────
-def run_ffmpeg_and_notify(job_id: str, src_path_str: str, dst_filename: str, download_url: str, opts: dict):
-    socketio.emit("status_update", {"job": job_id, "status": "Обработка..."}, to=job_id)
-    src_path = pl.Path(src_path_str)
+async def run_ffmpeg_and_notify(websocket: WebSocket, job_id: str, src_path: pl.Path, dst_filename: str, opts: dict):
     dst_path = TMP / dst_filename
 
-    try:
-        vb = calc_video_bitrate(opts["max_mb"], opts["clip_sec"])
-        vf = f"crop='min(iw\\,ih)':min(iw\\,ih),setsar=1,scale={opts['size']}:{opts['size']}"
+    ### ИЗМЕНЕНО: Возвращена логика очереди с проверкой на None
+    if ffmpeg_semaphore.locked():
+        # Используем getattr для безопасного доступа к внутреннему атрибуту
+        waiters_list = getattr(ffmpeg_semaphore, '_waiters', None)
+        position = len(waiters_list) + 1 if waiters_list is not None else 1
+        await websocket.send_json({"type": "queued", "job": job_id, "position": position})
 
-        cmd = [
-            "ffmpeg", "-y", "-ss", str(opts["offset"]), "-t", str(opts["clip_sec"]),
-            "-i", str(src_path), "-vf", vf, "-c:v", "libx264", "-b:v", f"{vb}k",
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac",
-            "-b:a", "128k", "-progress", "pipe:1", "-f", "mp4", str(dst_path)
-        ]
+    async with ffmpeg_semaphore:
+        try:
+            await websocket.send_json({"type": "status_update", "job": job_id, "status": "Processing..."})
 
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding='utf-8')
+            vb = calc_video_bitrate(opts["max_mb"], opts["clip_sec"])
+            vf = f"crop='min(iw\\,ih)':min(iw\\,ih),setsar=1,scale={opts['size']}:{opts['size']}"
 
-        for line in proc.stdout:
-            if line.startswith("out_time_ms"):
-                try:
-                    ms = int(line.strip().split("=")[1]) // 1000
-                    socketio.emit("progress", {"job": job_id, "ms": ms}, to=job_id)
-                except (ValueError, IndexError):
-                    continue
-        proc.wait()
+            cmd = [
+                "ffmpeg", "-y", "-ss", str(opts["offset"]), "-t", str(opts["clip_sec"]),
+                "-i", str(src_path), "-vf", vf, "-c:v", "libx264", "-b:v", f"{vb}k",
+                "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "aac",
+                "-b:a", "128k", "-progress", "pipe:1", "-f", "mp4", str(dst_path)
+            ]
 
-        socketio.emit("status_update", {"job": job_id, "status": "Финализация..."}, to=job_id)
+            proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
 
-        tg_ok = False
-        if opts.get("token") and opts.get("chat"):
-            if dst_path.exists() and dst_path.stat().st_size > 0:
-                socketio.emit("status_update", {"job": job_id, "status": "Отправка в Telegram..."}, to=job_id)
-                tg_ok = send_to_telegram(dst_path, opts["token"], opts["chat"])
+            while proc.stdout and (line := await proc.stdout.readline()):
+                line_str = line.decode('utf-8').strip()
+                if line_str.startswith("out_time_ms"):
+                    try:
+                        ms = int(line_str.split("=")[1]) // 1000
+                        await websocket.send_json({"type": "progress", "job": job_id, "ms": ms})
+                    except (ValueError, IndexError):
+                        continue
+            await proc.wait()
 
-        socketio.emit("done", {
-            "job": job_id,
-            "download": download_url,
-            "telegram": tg_ok,
-            "ttl": TTL_SECONDS
-        }, to=job_id)
+            await websocket.send_json({"type": "status_update", "job": job_id, "status": "Finalizing..."})
+            
+            tg_ok = False
+            if opts.get("token") and opts.get("chat"):
+                if dst_path.exists() and dst_path.stat().st_size > 0:
+                    await websocket.send_json({"type": "status_update", "job": job_id, "status": "Sending to Telegram..."})
+                    tg_ok = await send_to_telegram(dst_path, opts["token"], opts["chat"])
+            
+            download_url = app.url_path_for('download', filename=dst_filename)
+            await websocket.send_json({
+                "type": "done",
+                "job": job_id,
+                "download": download_url,
+                "telegram": tg_ok,
+                "ttl": TTL_SECONDS
+            })
 
-    except Exception as e:
-        log.error(f"Error in background task for job {job_id}: {e}")
-        socketio.emit("status_update", {"job": job_id, "status": "Ошибка во время конвертации."}, to=job_id)
-
-    finally:
-        if src_path.exists():
-            src_path.unlink()
+        except Exception as e:
+            log.error(f"Error in background task for job {job_id}: {e}", exc_info=True)
+            try:
+                await websocket.send_json({"type": "error", "job": job_id, "message": f"An unexpected error occurred: {e}"})
+            except WebSocketDisconnect:
+                pass
+        finally:
+            if src_path.exists():
+                os.unlink(src_path)
 
 # ───────────── routes ───────────────────
-@app.route("/")
-def index():
-    return render_template("index.html", max_clip_seconds=MAX_CLIP_SECONDS)
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "max_clip_seconds": MAX_CLIP_SECONDS})
 
 @app.post("/api/upload")
-def api_upload():
-    up = request.files.get("video")
-    if not up or not up.filename:
-        return jsonify(error="file field missing"), 400
+async def api_upload(video: UploadFile = File(...)):
+    if not video or not video.filename:
+        raise HTTPException(status_code=400, detail="file field missing")
 
     job_id = uuid.uuid4().hex
-    tmp_in = TMP / f"in_{job_id}{pl.Path(up.filename).suffix}"
-    up.save(tmp_in)
+    suffix = pl.Path(video.filename).suffix
+    tmp_in = TMP / f"in_{job_id}{suffix}"
 
     try:
-        meta = ffprobe_meta(tmp_in)
+        async with aiofiles.open(tmp_in, 'wb') as f:
+            while content := await video.read(1024 * 1024):
+                await f.write(content)
+        
+        meta = await ffprobe_meta(tmp_in)
         size_mb = round(tmp_in.stat().st_size / 2**20, 2)
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        log.error(f"Failed to get metadata for {tmp_in}: {e}")
-        tmp_in.unlink(missing_ok=True)
-        return jsonify(error="Invalid video file"), 400
 
-    return jsonify(job_id=job_id, duration=meta["duration"], width=meta["width"], height=meta["height"], size_mb=size_mb)
+    except (RuntimeError, FileNotFoundError) as e:
+        log.error(f"Failed to process upload {tmp_in}: {e}")
+        if tmp_in.exists():
+            os.unlink(tmp_in)
+        raise HTTPException(status_code=400, detail="Invalid video file")
 
-@app.post("/api/convert")
-def api_convert():
-    job_id = request.form.get("job_id")
-    clip_duration = float(request.form.get("duration", 0))
+    return {"job_id": job_id, "duration": meta["duration"], "width": meta["width"], "height": meta["height"], "size_mb": size_mb}
 
-    if clip_duration > MAX_CLIP_SECONDS:
-        return jsonify(error=f"Duration cannot exceed {MAX_CLIP_SECONDS} seconds."), 400
-    if not job_id:
-        return jsonify(error="job_id missing"), 400
-
+@app.websocket("/ws/{job_id}")
+async def websocket_endpoint(websocket: WebSocket, job_id: str):
+    await websocket.accept()
+    log.info(f"WebSocket /ws/{job_id} [accepted]")
     try:
-        tmp_in = next(TMP.glob(f"in_{job_id}*"))
-    except StopIteration:
-        return jsonify(error="Original file not found for this job_id"), 404
+        tmp_in = next(TMP.glob(f"in_{job_id}*"), None)
+        if not tmp_in:
+            await websocket.send_json({"type": "error", "message": "File not found for this job_id. Please upload again."})
+            return
 
-    is_for_telegram = bool(request.form.get("token") and request.form.get("chat"))
-    opts = {
-        "size": int(request.form.get("size", 640)),
-        "offset": float(request.form.get("offset", 0)),
-        "clip_sec": clip_duration,
-        "max_mb": 8 if is_for_telegram else 100,
-        "token": request.form.get("token"),
-        "chat": request.form.get("chat"),
-    }
-    
-    dst_filename = f"{tmp_in.stem}_round.mp4"
-    download_url = url_for('download', filename=dst_filename, _external=True)
+        data = await websocket.receive_json()
+        if data.get("type") != "start_conversion":
+            return
+        
+        opts = data.get("options", {})
+        clip_duration = float(opts.get("clip_sec", 0))
 
-    executor.submit(
-        run_ffmpeg_and_notify,
-        job_id=job_id,
-        src_path_str=str(tmp_in),
-        dst_filename=dst_filename,
-        download_url=download_url,
-        opts=opts
-    )
+        if clip_duration <= 0 or clip_duration > MAX_CLIP_SECONDS:
+            await websocket.send_json({"type": "error", "message": f"Duration must be between 1 and {MAX_CLIP_SECONDS} seconds."})
+            return
 
-    socketio.emit("status_update", {"job": job_id, "status": "В очереди..."}, to=job_id)
-    return jsonify(status="ok", message="Conversion queued")
+        is_for_telegram = bool(opts.get("token") and opts.get("chat"))
+        opts["max_mb"] = 8 if is_for_telegram else 100
 
-@socketio.on("join")
-def on_join(data):
-    join_room(data["job"])
+        dst_filename = f"{tmp_in.stem}_round.mp4"
+        
+        asyncio.create_task(run_ffmpeg_and_notify(
+            websocket=websocket,
+            job_id=job_id,
+            src_path=tmp_in,
+            dst_filename=dst_filename,
+            opts=opts
+        ))
+        while True:
+            await websocket.receive_text()
 
-@socketio.on("leave")
-def on_leave(data):
-    leave_room(data["job"])
+    except WebSocketDisconnect:
+        log.info(f"Client {job_id} disconnected.")
+    except Exception as e:
+        log.error(f"WebSocket Error for job {job_id}: {e}")
 
-@app.get("/download/<path:filename>")
-def download(filename):
-    return send_from_directory(TMP, filename, as_attachment=True, max_age=TTL_SECONDS)
+
+@app.get("/download/{filename:path}", response_class=FileResponse)
+async def download(filename: str):
+    path = TMP / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="File not found or expired.")
+    return FileResponse(path, media_type='video/mp4', filename=filename)
 
 @app.get("/ping")
-def ping():
+async def ping():
     return "pong"
 
-def janitor():
+async def janitor():
+    log.info("Janitor starting...")
     while True:
-        now = time.time()
         try:
+            now = time.time()
             for p in TMP.iterdir():
                 if p.is_file() and p.stat().st_mtime < now - TTL_SECONDS:
+                    log.info(f"Janitor removing expired file: {p.name}")
                     p.unlink(missing_ok=True)
         except Exception as e:
             log.error(f"Janitor error: {e}")
-        time.sleep(max(TTL_SECONDS, 60))
+        await asyncio.sleep(max(TTL_SECONDS, 60))
 
-janitor_thread = threading.Thread(target=janitor, daemon=True)
-janitor_thread.start()
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(janitor())

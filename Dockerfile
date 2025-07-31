@@ -14,9 +14,9 @@ WORKDIR /app
 COPY --from=build /usr/local /usr/local
 COPY . .
 
-ENV ROUNDIFY_JOBS=3
+ENV ROUNDIFY_JOBS=2
 ENV TTL_SECONDS=60
-ENV GUNICORN_CMD_ARGS="--worker-tmp-dir /dev/shm --workers 1 --timeout 300"
 
 EXPOSE 8000
-CMD ["gunicorn","-k","eventlet","-b","0.0.0.0:8000","app:app"]
+### Изменено: Команда запуска Gunicorn с Uvicorn воркером для ASGI приложения.
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "app:app"]

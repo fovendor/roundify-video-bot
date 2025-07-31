@@ -6,9 +6,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#d3d3d3">
   <title>Roundify</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}?v=2">
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='favicon.ico') }}?v=2">
 </head>
 
 <body>
@@ -51,7 +50,7 @@
     </section>
 
   </main>
-  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  <script src="{{ url_for('static', path='js/app.js') }}"></script>
 </body>
 
 </html>
