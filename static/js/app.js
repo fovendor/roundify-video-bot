@@ -125,9 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function handleDone(d) {
-    updateProgress(1); // Завершаем прогресс-бар до 100%
+    updateProgress(1);
 
-    // Создаем и показываем ссылку на скачивание
     const downloadLink = document.createElement('a');
     downloadLink.href = d.download;
     downloadLink.target = "_blank";
@@ -144,9 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         timerSpan.textContent = `ещё: ${remainingTime}с`;
         remainingTime--;
       } else {
-        timerSpan.textContent = `(ссылка истекла)`;
-        downloadLink.style.pointerEvents = "none";
-        downloadLink.style.textDecoration = "line-through";
+        // Просто останавливаем таймер. Очисткой займется `resetUI` ниже.
         clearInterval(statusTimer);
       }
     };
@@ -158,16 +155,15 @@ document.addEventListener('DOMContentLoaded', () => {
     status.append(' можно ');
     status.appendChild(timerSpan);
     
-    // ### ИЗМЕНЕНО: Немедленно сбрасываем интерфейс для новой загрузки
     resetForNewUpload();
 
-    // Полный сброс UI (включая удаление ссылки) произойдет позже
+    // Полный сброс UI (включая удаление ссылки) произойдет ровно через TTL секунд.
     if (resetTimer) clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
       if (d.job === currentJobId) {
         resetUI();
       }
-    }, d.ttl * 1000 + 1000);
+    }, d.ttl * 1000);
   }
 
   chevBtn.addEventListener("click", () => {
@@ -199,30 +195,31 @@ document.addEventListener('DOMContentLoaded', () => {
   offsetSlider.addEventListener("input", () => $("#offOut").textContent = offsetSlider.value);
   sizeSlider.addEventListener("input", () => $("#sizeOut").textContent = sizeSlider.value);
 
-  // ### ИЗМЕНЕНО: Новая функция для "легкого" сброса UI
   function resetForNewUpload() {
       uploadLabel.classList.remove('is-disabled');
       fileLbl.textContent = 'Загрузить видео...';
       fileLbl.style.color = '';
       progressBarFill.style.width = '0%';
-      convertBtn.disabled = true; // Кнопка конвертации должна быть неактивна до выбора нового файла
-      fileInp.value = ''; // Очищаем поле ввода файла
-      if (currentJobId) {
-          sio.emit("leave", { job: currentJobId });
-          currentJobId = null;
+      convertBtn.disabled = true;
+      fileInp.value = '';
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        // Вместо sio.emit("leave", ...), просто закрываем соединение,
+        // так как для нового задания будет новое.
+        // Оставим логику закрытия в resetUI.
       }
+      // currentJobId обнуляется при новом успешном аплоаде
   }
   
-  // Эта функция теперь для полного сброса, в основном для таймера
   function resetUI() {
-    resetForNewUpload(); // Она включает в себя легкий сброс
-    status.innerHTML = ''; // И дополнительно очищает поле статуса (ссылку)
+    resetForNewUpload();
+    status.innerHTML = '';
     if (ws) {
       ws.close();
       ws = null;
     }
     if (statusTimer) clearInterval(statusTimer);
     if (resetTimer) clearTimeout(resetTimer);
+    currentJobId = null; // Обнуляем job_id здесь
   }
 
   function resetProgress() {

@@ -14,7 +14,7 @@ WORKDIR /app
 COPY --from=build /usr/local /usr/local
 COPY . .
 
-ENV ROUNDIFY_JOBS=2
+ENV ROUNDIPY_JOBS=2
 ENV TTL_SECONDS=60
 
 EXPOSE 8000

@@ -20,12 +20,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # ─────────────── settings ───────────────
-WORKERS = int(os.getenv("ROUNDIFY_JOBS", 2))
+WORKERS = int(os.getenv("ROUNDIPY_JOBS", 2))
 ffmpeg_semaphore = asyncio.Semaphore(WORKERS)
 
 TTL_SECONDS = int(os.getenv("TTL_SECONDS", 60))
 MAX_CLIP_SECONDS = int(os.getenv("MAX_CLIP_SECONDS", 60))
-TMP = pl.Path(tempfile.gettempdir()) / "roundify_ws"
+TMP = pl.Path(tempfile.gettempdir()) / "roundipy_ws"
 TMP.mkdir(exist_ok=True)
 
 # ────────── FastAPI ───────────
@@ -33,7 +33,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-log = logging.getLogger("roundify")
+log = logging.getLogger("roundipy")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 
