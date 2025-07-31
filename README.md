@@ -1,6 +1,4 @@
-Of course. Here is the translated `README.md` file.
-
-# Roundipy
+# RoundiPy
 
 **Roundipy** is a web service that converts any video into a perfect circular Telegram Video Note. The conversion process features a real-time progress bar via WebSocket, and the result can be instantly sent to Telegram.
 
