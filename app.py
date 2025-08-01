@@ -14,7 +14,6 @@ from typing import Any, Dict
 
 import aiofiles
 import httpx
-from starlette.middleware.proxy_headers import ProxyHeadersMiddleware  # ← NEW
 from fastapi import (FastAPI, File, Form, HTTPException, Request, UploadFile,
                      WebSocket, WebSocketDisconnect)
 from fastapi.responses import FileResponse, HTMLResponse
@@ -34,10 +33,6 @@ TMP.mkdir(exist_ok=True)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
-
-# NEW: доверяем заголовкам, проставленным nginx‑прокси,
-# чтобы FastAPI корректно определял scheme=https
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="127.0.0.1")
 
 log = logging.getLogger("roundipy")
 logging.basicConfig(level=logging.INFO,
