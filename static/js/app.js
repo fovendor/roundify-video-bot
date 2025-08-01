@@ -1,6 +1,10 @@
+/* eslint-env browser */
 document.addEventListener('DOMContentLoaded', () => {
   /* mini-$ selector */
   const $ = s => document.querySelector(s);
+
+  // ───── constants ─────
+  const MAX_SIZE_BYTES = 600 * 1024 * 1024; // 600 МБ
 
   const fileInp = $("#file"),
     uploadLabel = $("#uploadLabel"),
@@ -25,10 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   convertBtn.disabled = true;
 
+  function bytesToMB(b) {
+    return (b / 1048576).toFixed(1);
+  }
+
   function connectWebSocket(jobId) {
-    if (ws) {
-      ws.close();
-    }
+    if (ws) ws.close();
+
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/${jobId}`);
 
@@ -44,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
           updateProgress(d.ms / (clipSec * 1000));
           break;
         case 'status_update':
-          // status.textContent = d.status;
+          // можно вывести d.status при желании
           break;
         case 'done':
           handleDone(d);
@@ -58,8 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    ws.onclose = () => { console.log('WebSocket disconnected.'); };
-    ws.onerror = (error) => {
+    ws.onclose  = () => console.log('WebSocket disconnected.');
+    ws.onerror  = (error) => {
       console.error('WebSocket Error:', error);
       status.textContent = "⚠️ Connection error.";
       resetUI();
@@ -69,6 +76,14 @@ document.addEventListener('DOMContentLoaded', () => {
   fileInp.addEventListener("change", async () => {
     const file = fileInp.files[0];
     if (!file) { resetUI(); return; }
+
+    /* --- новая клиентская проверка размера --- */
+    if (file.size > MAX_SIZE_BYTES) {
+      status.textContent = `⚠️ Файл слишком большой: ${bytesToMB(file.size)} МБ. Лимит — 600 МБ.`;
+      fileInp.value = '';
+      return;
+    }
+    /* ----------------------------------------- */
 
     resetUI();
     uploadLabel.classList.add('is-disabled');
@@ -80,14 +95,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const r = await fetch("/api/upload", { method: "POST", body: fd });
+
+      /* --- обработка 413 от сервера --- */
+      if (r.status === 413) {
+        throw new Error("Файл превышает лимит 600 МБ (проверка сервера)");
+      }
+      /* -------------------------------- */
+
       const meta = await r.json();
       if (!r.ok) throw new Error(meta.detail || r.statusText);
 
       currentJobId = meta.job_id;
       sourceDuration = meta.duration;
 
-      updateSliders(sourceDuration, Math.min(parseInt(durationSlider.max, 10), sourceDuration));
-      fileLbl.textContent = `${meta.duration.toFixed(1)} сек | ${meta.width}×${meta.height} | ${meta.size_mb.toFixed(1)}MB`;
+      updateSliders(
+        sourceDuration,
+        Math.min(parseInt(durationSlider.max, 10), sourceDuration)
+      );
+      fileLbl.textContent =
+        `${meta.duration.toFixed(1)} сек | ${meta.width}×${meta.height} | ${meta.size_mb.toFixed(1)} МБ`;
 
       convertBtn.disabled = false;
       uploadLabel.classList.remove('is-disabled');
@@ -100,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   convertBtn.addEventListener("click", () => {
     if (!currentJobId || !ws || ws.readyState !== WebSocket.OPEN) {
-      status.textContent = "Please select a file and wait for connection.";
+      status.textContent = "Сначала выберите файл и дождитесь подключения.";
       return;
     }
 
@@ -118,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clip_sec: parseFloat(durationSlider.value),
         offset: parseFloat(offsetSlider.value),
         token: tokenInp.value,
-        chat: chatInp.value,
+        chat:  chatInp.value,
       }
     };
     ws.send(JSON.stringify(payload));
@@ -143,7 +169,6 @@ document.addEventListener('DOMContentLoaded', () => {
         timerSpan.textContent = `ещё: ${remainingTime}с`;
         remainingTime--;
       } else {
-        // Просто останавливаем таймер. Очисткой займется `resetUI` ниже.
         clearInterval(statusTimer);
       }
     };
@@ -154,10 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
     status.appendChild(downloadLink);
     status.append(' можно ');
     status.appendChild(timerSpan);
-    
     resetForNewUpload();
 
-    // Полный сброс UI (включая удаление ссылки) произойдет ровно через TTL секунд.
     if (resetTimer) clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
       if (d.job === currentJobId) {
@@ -171,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     advBlk.classList.toggle("open");
   });
 
+  /* ─── sliders ───────────────────── */
   function updateSliders(totalDuration, defaultClipDuration) {
     durationSlider.max = Math.ceil(Math.min(totalDuration, parseInt(durationSlider.max, 10)));
     durationSlider.value = Math.ceil(defaultClipDuration);
@@ -193,23 +217,18 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   offsetSlider.addEventListener("input", () => $("#offOut").textContent = offsetSlider.value);
-  sizeSlider.addEventListener("input", () => $("#sizeOut").textContent = sizeSlider.value);
+  sizeSlider.addEventListener("input",   () => $("#sizeOut").textContent = sizeSlider.value);
 
+  /* ─── helpers / reset ───────────── */
   function resetForNewUpload() {
-      uploadLabel.classList.remove('is-disabled');
-      fileLbl.textContent = 'Загрузить видео...';
-      fileLbl.style.color = '';
-      progressBarFill.style.width = '0%';
-      convertBtn.disabled = true;
-      fileInp.value = '';
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        // Вместо sio.emit("leave", ...), просто закрываем соединение,
-        // так как для нового задания будет новое.
-        // Оставим логику закрытия в resetUI.
-      }
-      // currentJobId обнуляется при новом успешном аплоаде
+    uploadLabel.classList.remove('is-disabled');
+    fileLbl.textContent = 'Загрузить видео...';
+    fileLbl.style.color = '';
+    progressBarFill.style.width = '0%';
+    convertBtn.disabled = true;
+    fileInp.value = '';
   }
-  
+
   function resetUI() {
     resetForNewUpload();
     status.innerHTML = '';
@@ -218,8 +237,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ws = null;
     }
     if (statusTimer) clearInterval(statusTimer);
-    if (resetTimer) clearTimeout(resetTimer);
-    currentJobId = null; // Обнуляем job_id здесь
+    if (resetTimer)  clearTimeout(resetTimer);
+    currentJobId = null;
   }
 
   function resetProgress() {
@@ -233,10 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
     fileLbl.textContent = `${Math.round(pct)}%`;
     progressBarFill.style.width = `${pct}%`;
 
-    if (pct >= 47) {
-      fileLbl.style.color = '#fff';
-    } else {
-      fileLbl.style.color = 'var(--accent)';
-    }
+    fileLbl.style.color = pct >= 47 ? '#fff' : 'var(--accent)';
   }
 });

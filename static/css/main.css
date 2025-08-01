@@ -71,6 +71,30 @@ label.upload.is-disabled:hover {
 }
 
 #progressBarFill {
+    width: 0%;
+    height: 4px;
+    background: #3498db;
+    transition: width 0.2s;
+}
+
+/* статус-сообщения */
+.result {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.result.ok {
+    color: #2ecc71;
+}
+
+/* зелёный  */
+.result.err {
+    color: #e74c3c;
+}
+
+/* красный  */
+
+#progressBarFill {
     position: absolute;
     left: 0;
     top: 0;
@@ -230,7 +254,8 @@ input[type=text] {
 #fileLabel,
 #status,
 #convert {
-  font-size: 14px; /* или другое значение, например 1rem */
+    font-size: 14px;
+    /* или другое значение, например 1rem */
 }
 
 @keyframes spin {
