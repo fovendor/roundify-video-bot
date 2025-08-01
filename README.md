@@ -64,11 +64,11 @@ This is the easiest and most reliable way to run the service in production.
 Create this file in the project root. This example includes advanced network settings to assign a static IP to the container, which can be useful in complex setups.
 
 ```yml
-version: "3.9"
-
 services:
   roundipy:
     build: .
+    image: roundipy-img
+    container_name: roundipy
     restart: unless-stopped
     environment:
       # Number of concurrent FFmpeg processes
@@ -80,6 +80,9 @@ services:
     ports:
       # The service will only be available locally on port 8000
       - "127.0.0.1:8000:8000"
+    volumes:
+      - ./static:/static
+    # -------------------------
     networks:
       roundipy_net:
         ipv4_address: 10.77.0.10

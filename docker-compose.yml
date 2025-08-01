@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   roundipy:
     build: .
@@ -7,13 +5,17 @@ services:
     container_name: roundipy
     restart: unless-stopped
     environment:
+      # Number of concurrent FFmpeg processes
       ROUNDIFY_JOBS: 2
+      # Lifetime of the finished file in seconds
       TTL_SECONDS: 60
+      # Maximum clip duration (Telegram's limit)
       MAX_CLIP_SECONDS: 60
     ports:
+      # The service will only be available locally on port 8000
       - "127.0.0.1:8000:8000"
     volumes:
-      - ./static:/app/static
+      - ./static:/static
     # -------------------------
     networks:
       roundipy_net:
