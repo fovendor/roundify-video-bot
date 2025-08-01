@@ -181,7 +181,7 @@ server {
 
 | Name | Default | Purpose |
 | --- | --- | --- |
-| `ROUNDIFY_JOBS` | 2 | Number of concurrent conversion jobs. |
+| `ROUNDIPY_JOBS` | 2 | Number of concurrent conversion jobs. |
 | `TTL_SECONDS` | 60 | Lifetime of the finished file and its download link. |
 | `MAX_CLIP_SECONDS` | 60 | Maximum duration of the final clip (Telegram's limit). |
 

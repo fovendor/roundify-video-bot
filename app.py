@@ -123,8 +123,11 @@ async def run_ffmpeg_and_notify(
     async with ffmpeg_semaphore:
         try:
             await websocket.send_json(
-                {"type": "status_update", "job": job_id, "status": "Processing..."}
+                {"type": "status_update", "job": "job_id", "status": "Processing..."}
             )
+
+            if not src_path.exists():
+                raise FileNotFoundError(f"Source file for job {job_id} not found. It may have expired.")
 
             vb = calc_video_bitrate(opts["max_mb"], opts["clip_sec"])
             vf = (
@@ -165,7 +168,7 @@ async def run_ffmpeg_and_notify(
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
             )
 
             while proc.stdout and (line := await proc.stdout.readline()):
@@ -177,7 +180,13 @@ async def run_ffmpeg_and_notify(
                         )
                     except (ValueError, IndexError):
                         pass
-            await proc.wait()
+            
+            _, stderr_data = await proc.communicate()
+            if proc.returncode != 0:
+                error_output = stderr_data.decode('utf-8', 'ignore').strip()
+                log.error(f"FFmpeg failed for job {job_id}:\n{error_output}")
+                raise RuntimeError(f"FFmpeg failed. Error: {error_output.splitlines()[-1] if error_output else 'Unknown'}")
+
 
             await websocket.send_json(
                 {"type": "status_update", "job": job_id, "status": "Finalizing..."}
@@ -334,7 +343,8 @@ async def janitor():
     while True:
         try:
             now = time.time()
-            for p in TMP.iterdir():
+            # Удаляем только обработанные файлы, а не исходные in_*.mp4
+            for p in TMP.glob("*_round.mp4"):
                 if p.is_file() and p.stat().st_mtime < now - TTL_SECONDS:
                     log.info(f"Janitor removing expired file: {p.name}")
                     p.unlink(missing_ok=True)
