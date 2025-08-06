@@ -4,52 +4,77 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#d3d3d3">
-  <title>Roundipy</title>
+  <title>RoundiPy</title>
+  <meta name="theme-color" content="#ecedf1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- [ИЗМЕНЕНИЕ] Удалены атрибуты integrity и crossorigin, чтобы избежать ошибок блокировки -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.css" />
+    
   <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='favicon.ico') }}?v=2">
 </head>
 
 <body>
   <main class="card">
-    <h1>Roundipy</h1>
+    <h1>RoundiPy</h1>
 
-    <label class="upload" for="file" id="uploadLabel">
-      <input id="file" type="file" accept="video/*" hidden>
-      <div id="progressBarFill"></div>
-      <span id="fileLabel">Загрузить видео...</span>
-    </label>
+    <div id="touchMeContainer">
+      <label class="touch-me-label" for="fileInput" id="touchMeButton">
+        <input id="fileInput" type="file" accept="video/*" hidden>
+        <span>TOUCH<br>ME</span>
+      </label>
+    </div>
 
-    <button id="convert">Конвертировать</button>
-
-    <button type="button" class="chevron" id="chevron" aria-label="Advanced">
-      <span></span><span></span>
-    </button>
-
-    <section class="advanced" id="advanced">
-      <div class="slider-wrap">
-        <label>Размер (px) <output id="sizeOut">640</output></label>
-        <input type="range" id="size" min="240" max="1024" step="16" value="640">
+    <div class="player-wrapper hidden" id="playerWrapper">
+      <div class="video-container">
+        <video id="videoPreview" playsinline muted loop></video>
+        <div class="video-overlay" id="videoOverlay">
+          <svg class="play-icon" viewBox="0 0 100 100">
+            <path d="M 35,25 L 75,50 L 35,75 Z" />
+          </svg>
+        </div>
+        <button class="delete-button" id="deleteButton" aria-label="Удалить видео">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M9,3V4H4V6H5V19C5,20.1 5.9,21 7,21H17C18.1,21 19,20.1 19,19V6H20V4H15V3H9M7,6H17V19H7V6M9,8V17H11V8H9M13,8V17H15V8H13Z" />
+          </svg>
+        </button>
+        <svg class="scrubber-svg" viewBox="0 0 200 200">
+          <circle class="scrubber-track" cx="100" cy="100" r="90" />
+          <circle class="scrubber-handle" id="scrubberHandle" cx="100" cy="10" r="10" />
+        </svg>
       </div>
-
-      <div class="slider-wrap">
-        <label>Длительность (сек) <output id="durOut">60</output></label>
-        <input type="range" id="duration" min="1" max="{{ max_clip_seconds }}" value="{{ max_clip_seconds }}">
+      <div class="controls">
+        <div class="control-group">
+          <div class="label-container">
+            <span>Длительность:</span>
+            <span id="durationValueLabel">60.0 сек</span>
+          </div>
+          <div id="durationSlider"></div>
+        </div>
+        <div class="control-group">
+          <div class="label-container">
+            <span>Разрешение:</span>
+            <span><output id="sizeOut">640</output> px</span>
+          </div>
+          <input type="range" id="sizeSlider" min="240" max="1024" step="16" value="640">
+        </div>
+        <input type="text" id="token" placeholder="Bot token">
+        <input type="text" id="chat" placeholder="@channel or chat-id">
+        <button id="convertButton" disabled>
+          <span class="btn-text">Отправить</span>
+          <span class="btn-loader hidden"></span>
+        </button>
       </div>
-
-      <div class="slider-wrap">
-        <label>Смещение начала видео (сек) <output id="offOut">0</output></label>
-        <input type="range" id="offset" min="0" max="600" value="0">
-      </div>
-
-      <input type="text" id="token" placeholder="Bot token">
-      <input type="text" id="chat" placeholder="@channel or chat-id">
-
-      <p class="small">Заполните оба поля для отправки кружочка в Telegram.</p>
-      <p id="status" class="result"></p>
-    </section>
-
+    </div>
   </main>
+
+  <!-- [ИЗМЕНЕНИЕ] Удалены атрибуты integrity и crossorigin, чтобы избежать ошибок блокировки -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.js"></script>
+    
   <script src="{{ url_for('static', path='js/app.js') }}"></script>
 </body>
 

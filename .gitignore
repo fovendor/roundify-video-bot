@@ -1,5 +1,5 @@
-/round/
-/venv/
+roundi/
+venv/
 
 __pycache__/
 *.py[cod]
