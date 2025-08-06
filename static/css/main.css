@@ -55,41 +55,43 @@ h1 {
   align-items: center;
 }
 
+/* [ИЗМЕНЕНИЕ] Применены ваши стили для кнопки */
 .touch-me-label {
-  width: 360px;
-  height: 360px;
-  border-radius: 50%;
-  background: var(--bg);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  box-shadow: -5px -5px 10px var(--sh-light), 5px 5px 10px var(--sh-dark);
-  transition: all 0.15s linear;
+    width: 360px;
+    height: 360px;
+    border-radius: 50%;
+    background: var(--bg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: -5px -5px 10px var(--sh-light), 5px 5px 10px var(--sh-dark);
+    transition: all 0.15s linear;
 }
 
 .touch-me-label:hover {
-  filter: brightness(1.02);
+    filter: brightness(1.02);
 }
 
 .touch-me-label:active {
-  box-shadow: inset -10px -10px 20px var(--sh-light), inset 10px 10px 20px var(--sh-dark);
+    box-shadow: inset -5px -5px 10px var(--sh-light), inset 5px 5px 10px var(--sh-dark);
 }
 
 .touch-me-label span {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #c5c8d0;
-  text-align: center;
-  line-height: 1.2;
-  user-select: none;
-  text-shadow: 2px 2px 4px var(--sh-dark), -2px -2px 4px var(--sh-light);
+    font-size: 2.9rem;
+    font-weight: 200;
+    color: var(--bg);
+    text-align: center;
+    line-height: 1.2;
+    user-select: none;
+    text-shadow: 1px 1px 2px var(--sh-dark), -1px -1px 2px var(--sh-light);
 }
 
 .touch-me-label:active span {
-  font-size: 2.8rem;
-  text-shadow: 1px 1px 2px var(--sh-dark), -1px -1px 2px var(--sh-light);
+    font-size: 2.8rem;
+    text-shadow: 1px 1px 3px var(--sh-dark), -1px -1px 3px var(--sh-light);
 }
+
 
 /* --- Экран плеера --- */
 .player-wrapper {
@@ -205,6 +207,11 @@ h1 {
   margin-bottom: 1.5rem;
 }
 
+/* [ИЗМЕНЕНИЕ] Добавлен отступ снизу для слайдера длительности */
+.control-group.duration-group {
+    margin-bottom: 3rem;
+}
+
 .label-container {
   display: flex;
   justify-content: space-between;
@@ -274,6 +281,7 @@ input[type=text] {
   border: none;
   box-shadow: inset -3px -3px 6px var(--sh-light), inset 3px 3px 6px var(--sh-dark);
   height: 10px;
+  position: relative;
 }
 
 .noUi-connect {
@@ -304,6 +312,27 @@ input[type=text] {
   width: 28px;
   height: 28px;
   top: -9px;
+}
+
+/* [ИЗМЕНЕНИЕ] Стили для всплывающих подсказок, чтобы они были СНИЗУ */
+.noUi-tooltip {
+  display: block;
+  position: absolute;
+  background: var(--accent);
+  color: white;
+  font-family: "Montserrat", sans-serif;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  /* Смещаем вниз, а не вверх */
+  transform: translate(-50%, 120%); 
+  border: none;
+  white-space: nowrap;
+}
+
+.noUi-horizontal .noUi-tooltip {
+    bottom: -4px;
 }
 
 input[type=range] {
@@ -337,22 +366,6 @@ input[type=range]::-moz-range-thumb {
   cursor: pointer;
   border: none;
   box-shadow: -2px -2px 5px var(--sh-light), 2px 2px 5px var(--sh-dark);
-}
-
-/* [НОВОЕ] Стили для всплывающих подсказок (облачков) над ползунками */
-.noUi-tooltip {
-  display: block;
-  position: absolute;
-  background: var(--accent);
-  color: white;
-  font-family: "Montserrat", sans-serif;
-  padding: 4px 8px;
-  border-radius: 5px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  transform: translate(-50%, -150%);
-  border: none;
-  white-space: nowrap;
 }
 
 /* --- Вспомогательные классы --- */
