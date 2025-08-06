@@ -2,9 +2,7 @@
   --bg: #ecedf1;
   --sh-dark: #b3b3b3;
   --sh-light: #ffffff;
-  /* [ИЗМЕНЕНИЕ] Цвет для основной кнопки "Отправить" */
   --accent: #3A4D6F;
-  /* [ИЗМЕНЕНИЕ] Цвет для слайдеров и их подсказок, как на макете */
   --accent-slider: #606680;
   --accent-disabled: #b0b6c2;
   --red: #e74c3c;
@@ -59,39 +57,39 @@ h1 {
 }
 
 .touch-me-label {
-    width: 360px;
-    height: 360px;
-    border-radius: 50%;
-    background: var(--bg);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    box-shadow: -5px -5px 10px var(--sh-light), 5px 5px 10px var(--sh-dark);
-    transition: all 0.15s linear;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: -5px -5px 10px var(--sh-light), 5px 5px 10px var(--sh-dark);
+  transition: all 0.15s linear;
 }
 
 .touch-me-label:hover {
-    filter: brightness(1.02);
+  filter: brightness(1.02);
 }
 
 .touch-me-label:active {
-    box-shadow: inset -5px -5px 10px var(--sh-light), inset 5px 5px 10px var(--sh-dark);
+  box-shadow: inset -5px -5px 10px var(--sh-light), inset 5px 5px 10px var(--sh-dark);
 }
 
 .touch-me-label span {
-    font-size: 2.9rem;
-    font-weight: 200;
-    color: var(--bg);
-    text-align: center;
-    line-height: 1.2;
-    user-select: none;
-    text-shadow: 1px 1px 2px var(--sh-dark), -1px -1px 2px var(--sh-light);
+  font-size: 2.9rem;
+  font-weight: 200;
+  color: var(--bg);
+  text-align: center;
+  line-height: 1.2;
+  user-select: none;
+  text-shadow: 1px 1px 2px var(--sh-dark), -1px -1px 2px var(--sh-light);
 }
 
 .touch-me-label:active span {
-    font-size: 2.8rem;
-    text-shadow: 1px 1px 3px var(--sh-dark), -1px -1px 3px var(--sh-light);
+  font-size: 2.8rem;
+  text-shadow: 1px 1px 3px var(--sh-dark), -1px -1px 3px var(--sh-light);
 }
 
 
@@ -183,7 +181,6 @@ h1 {
   pointer-events: none;
 }
 
-/* [ИЗМЕНЕНИЕ] Стили для трека скраббера, чтобы он был тонкой разомкнутой дугой */
 .scrubber-track {
   fill: none;
   stroke: #e0e1e6;
@@ -224,9 +221,8 @@ h1 {
   margin-bottom: 1rem;
 }
 
-/* [ИЗМЕНЕНИЕ] Добавляем отступ сверху для группы "Разрешение" */
 .resolution-group {
-    margin-top: 2.8rem;
+  margin-top: 2.8rem;
 }
 
 .label-container {
@@ -270,7 +266,6 @@ input[type=text] {
   box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
 }
 
-/* [ИЗМЕНЕНИЕ] Стиль для неактивной кнопки "Отправить", как на макете */
 #convertButton:disabled {
   color: var(--accent-disabled);
   background: var(--bg);
@@ -301,8 +296,17 @@ input[type=text] {
   border-radius: 5px;
   border: none;
   box-shadow: inset -3px -3px 6px var(--sh-light), inset 3px 3px 6px var(--sh-dark);
-  height: 8px; /* [ИЗМЕНЕНИЕ] Делаем тоньше */
+  height: 8px;
   position: relative;
+  /* [ИЗМЕНЕНИЕ] Добавляем padding, равный половине ширины ручки (24px / 2 = 12px) */
+  padding: 0 12px;
+  box-sizing: border-box;
+  /* Важно для правильного расчета ширины */
+}
+
+/* [ИЗМЕНЕНИЕ] Компенсируем padding для элемента-соединителя */
+.noUi-connects {
+  margin: 0 -12px;
 }
 
 .noUi-connect {
@@ -322,31 +326,28 @@ input[type=text] {
   display: none;
 }
 
-.noUi-handle.noUi-handle-lower {
-  right: -12px;
-}
-
-.noUi-handle.noUi-handle-upper {
-  right: -12px;
-}
-
 .noUi-horizontal .noUi-handle {
   width: 24px;
   height: 24px;
   top: -8px;
+  /* [ИЗМЕНЕНИЕ] Убираем позиционирование через right, т.к. padding делает всю работу */
+  right: -12px;
+  /* Это позиционирует ЦЕНТР ручки. С padding это теперь правильно. */
 }
 
 .noUi-tooltip {
   position: absolute;
   display: block;
   background: var(--accent-slider);
-  color: #fff;
-  font-weight: 600;
+  color: white;
+  font-weight: 400;
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 0.8rem;
-  transform: translate(-50%, 12px);     /* центр */
-  bottom: 100%;
+  /* [ИЗМЕНЕНИЕ] Новое позиционирование подсказок */
+  bottom: -28px;
+  transform: translateX(-50%);
+  left: 50%;
   white-space: nowrap;
 }
 
@@ -366,22 +367,11 @@ input[type=text] {
   transform: translate(0, 0);        /* без смещения по X */
 }
 
-.noUi-horizontal .noUi-handle {
-  right: 0;             /* центр → находится ПОСЕРЕДИНЕ трека,
-                           и ручка больше не «торчит» наружу */
-}
-
-/* Если ты менял right отдельно для lower/upper, тоже обнуляем: */
-.noUi-horizontal .noUi-handle-lower,
-.noUi-horizontal .noUi-handle-upper {
-  right: 0;
-}
-
 input[type=range] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 8px; /* [ИЗМЕНЕНИЕ] Делаем тоньше */
+  height: 8px;
   background: #E0E1E6;
   outline: none;
   border-radius: 5px;
