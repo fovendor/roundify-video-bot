@@ -97,16 +97,24 @@ h1 {
 .player-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  /* gap удален */
 }
 
-.video-container {
+/* Эта обертка служит контекстом для кнопок */
+.video-area {
   position: relative;
+  margin-bottom: 2rem; /* Немного увеличен отступ */
+}
+
+/* Этот контейнер обрезает видео и задает ему квадратную форму */
+.video-container {
+  position: relative; /* ВАЖНО: возвращаем для позиционирования дочернего видео */
   width: 100%;
-  padding-top: 100%;
+  padding-top: 100%; /* Трюк для создания квадратного контейнера */
   border-radius: 50%;
   background-color: var(--bg);
   box-shadow: inset -8px -8px 16px var(--sh-light), inset 8px 8px 16px var(--sh-dark);
+  overflow: hidden;
 }
 
 #videoPreview {
@@ -115,9 +123,10 @@ h1 {
   left: 0;
   width: 100%;
   height: 100%;
-  border-radius: 50%;
+  /* border-radius убран, т.к. обрезкой занимается родитель */
   object-fit: cover;
-  transform: scale(0.92);
+  transform: scale(1); /* Изначальный масштаб можно вернуть в 1 */
+  transition: transform .1s ease-out;
   background-color: #000;
   cursor: pointer;
 }
@@ -127,8 +136,8 @@ h1 {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 300px;
-  height: 300px;
+  width: 80%; /* Можно сделать относительным */
+  height: 80%;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -139,6 +148,8 @@ h1 {
 
 .play-icon {
   fill: #ffffffa3;
+  width: 30%; /* Размер иконки относительно оверлея */
+  height: 30%;
 }
 
 .delete-button {
@@ -156,6 +167,7 @@ h1 {
   justify-content: center;
   cursor: pointer;
   box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
+  z-index: 10;
 }
 
 .delete-button:active {
@@ -181,8 +193,10 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: default;
   box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
+  z-index: 10;
+  font-size: 0.9rem;
 }
 
 .resize-button {
@@ -198,8 +212,9 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: ns-resize;
   box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
+  z-index: 10;
 }
 
 .resize-button svg {
@@ -221,8 +236,9 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: move;
   box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
+  z-index: 10;
 }
 
 .move-button svg {
@@ -266,7 +282,6 @@ h1 {
   stroke: #606680;
   stroke-width: 4;
   stroke-dasharray: 1000;
-  /* временное значение, будет заменено в JS */
   stroke-dashoffset: 1000;
   transition: stroke-dashoffset 0.1s linear;
   pointer-events: none;
@@ -315,7 +330,6 @@ input[type=text] {
   margin: 1.5rem 0 0.8rem 0;
   font-weight: 400;
   cursor: pointer;
-  /* transition: all 0.2s ease; */
   background: var(--bg);
   color: var(--accent);
   box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
@@ -326,7 +340,6 @@ input[type=text] {
 }
 
 #convertButton:active {
-  /* font-size: 19.5px; */
   box-shadow: inset -2px -2px 4px var(--sh-light), inset 2px 2px 4px var(--sh-dark);
 }
 
@@ -362,13 +375,10 @@ input[type=text] {
   box-shadow: inset -3px -3px 6px var(--sh-light), inset 3px 3px 6px var(--sh-dark);
   height: 8px;
   position: relative;
-  /* [ИЗМЕНЕНИЕ] Добавляем padding, равный половине ширины ручки (24px / 2 = 12px) */
   padding: 0 12px;
   box-sizing: border-box;
-  /* Важно для правильного расчета ширины */
 }
 
-/* [ИЗМЕНЕНИЕ] Компенсируем padding для элемента-соединителя */
 .noUi-connects {
   margin: 0 -12px;
 }
@@ -406,7 +416,6 @@ input[type=text] {
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 0.8rem;
-  /* [ИЗМЕНЕНИЕ] Новое позиционирование подсказок */
   bottom: -28px;
   transform: translateX(-50%);
   left: 50%;
@@ -417,21 +426,15 @@ input[type=text] {
   bottom: -130%;
 }
 
-/* --- Новые точные позиции под каждую ручку --- */
 .noUi-horizontal .noUi-handle-lower .noUi-tooltip {
   left: 0;
-  /* левый край = левому краю ручки */
   transform: translate(0, 0);
-  /* без смещения по X */
 }
 
 .noUi-horizontal .noUi-handle-upper .noUi-tooltip {
   right: 0;
-  /* правый край = правому краю ручки */
   left: auto;
-  /* выключаем наследованный left */
   transform: translate(0, 0);
-  /* без смещения по X */
 }
 
 input[type=range] {

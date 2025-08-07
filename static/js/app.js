@@ -1,8 +1,12 @@
+// static/js/app.js
 const initApp = () => {
-  // --- Константы и Настройки ---
+  /* ─── Константы ───────────────────────────────────────────── */
   const MAX_CLIP_SECONDS = 60;
+  const MIN_SCALE        = 1;   // 100 %
+  const MAX_SCALE        = 4;   // 400 %
+  const SCALE_SENSITIVITY = 0.005; // чем меньше — тем “медленнее” зум
 
-  // --- DOM элементы ---
+  /* ─── DOM-элементы ────────────────────────────────────────── */
   const fileInput        = document.getElementById('fileInput');
   const touchMeContainer = document.getElementById('touchMeContainer');
   const playerWrapper    = document.getElementById('playerWrapper');
@@ -10,8 +14,10 @@ const initApp = () => {
   const videoOverlay     = document.getElementById('videoOverlay');
   const deleteButton     = document.getElementById('deleteButton');
   const convertButton    = document.getElementById('convertButton');
+  const resizeButton     = document.getElementById('resizeButton');  // ID ИЗМЕНЕН
+  const currentTimeSpan  = document.querySelector('#currentTime span');
 
-  // элементы управления
+  // Круговой скраббер
   const scrubberHandle   = document.getElementById('scrubberHandle');
   const scrubberProgress = document.getElementById('scrubberProgress');
   let   scrubberPathLength = 0;
@@ -20,28 +26,27 @@ const initApp = () => {
     scrubberProgress.style.strokeDasharray  = scrubberPathLength;
     scrubberProgress.style.strokeDashoffset = scrubberPathLength;
   }
+
+  // Другие контролы
   const durationSliderEl   = document.getElementById('durationSlider');
   const durationValueLabel = document.getElementById('durationValueLabel');
   const sizeSlider         = document.getElementById('sizeSlider');
   const sizeOut            = document.getElementById('sizeOut');
 
-  // новый элемент – вывод текущего времени
-  const currentTimeSpan = document.querySelector('#currentTime span');  // :contentReference[oaicite:0]{index=0}
+  /* ─── Состояние ───────────────────────────────────────────── */
+  let videoFile      = null;
+  let videoObjectURL = null;
+  let durationSlider = null;
+  let isScrubbing    = false;
 
-  if (!fileInput || !scrubberHandle || !durationSliderEl || !currentTimeSpan) {
-    console.error('Критическая ошибка: один или несколько HTML-элементов не найдены.');
-    return;
-  }
+  let scale   = 1;   // коэффициент зума (1 … 4)
+  let offsetX = 0;   // пригодится на шаге 4
+  let offsetY = 0;
 
-  // --- Переменные состояния ---
-  let videoFile       = null;
-  let videoObjectURL  = null;
-  let durationSlider  = null;
-  let isScrubbing     = false;
+  /* ─── Хелперы ─────────────────────────────────────────────── */
+  const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
 
-  // --- Хелперы ---
-
-  const formatTime = (seconds) => {          // :contentReference[oaicite:1]{index=1}
+  const formatTime = (seconds) => {
     const min = Math.floor(seconds / 60);
     const sec = Math.floor(seconds % 60);
     return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
@@ -56,30 +61,33 @@ const initApp = () => {
     const max        = slider.max || 100;
     const value      = slider.value;
     const percentage = ((value - min) / (max - min)) * 100;
-    const sliderColor = '#606680';
-    slider.style.background =
-      `(to right, ${sliderColor} ${percentage}%, #E0E1E6 ${percentage}%)`;
+    const c          = '#606680';
+    slider.style.background = `linear-gradient(to right, ${c} ${percentage}%, #E0E1E6 ${percentage}%)`;
   };
 
-  /** [ИЗМЕНЕНИЕ] Новая, точная математика для позиционирования дотика на дуге */
+  /** Пересчёт позиции “точки” на дуге прогресс-бара */
   const updateScrubberHandle = (time, duration) => {
-    if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(time)) return;
+    if (!Number.isFinite(duration) || duration <= 0) return;
 
     const progress = Math.max(0, Math.min(1, time / duration));
-    const angle    = -75 + (progress * 330);
-
+    const angle    = -75 + progress * 330;
     const x = 100 + 90 * Math.cos(angle * Math.PI / 180);
     const y = 100 + 90 * Math.sin(angle * Math.PI / 180);
 
     scrubberHandle.setAttribute('cx', x);
     scrubberHandle.setAttribute('cy', y);
 
-    // Теперь точно!
-    const dashOffset = scrubberPathLength * (1 - progress);
-    scrubberProgress.style.strokeDashoffset = dashOffset;
+    scrubberProgress.style.strokeDashoffset =
+      scrubberPathLength * (1 - progress);
   };
 
-  // --- Функции переключения UI ---
+  /** Применяет текущие offset/scale к видео */
+  const applyTransform = () => {
+    videoPreview.style.transform =
+      `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  };
+
+  /* ─── Переключение экранов ───────────────────────────────── */
   const showPlayer = () => {
     touchMeContainer.classList.add('hidden');
     playerWrapper.classList.remove('hidden');
@@ -95,6 +103,8 @@ const initApp = () => {
     fileInput.value   = '';
     durationSlider    = null;
 
+    scale = 1; offsetX = offsetY = 0; applyTransform();
+
     sizeSlider.value  = 640;
     sizeOut.textContent = sizeSlider.value;
     updateRangeFill(sizeSlider);
@@ -105,8 +115,7 @@ const initApp = () => {
     currentTimeSpan.textContent = '00:00';
   };
 
-  // --- Инициализация элементов управления ---
-
+  /* ─── noUiSlider: диапазон длительности ───────────────────── */
   const initDurationSlider = (videoDuration) => {
     const start = 0;
     const end   = Math.min(videoDuration, MAX_CLIP_SECONDS);
@@ -120,21 +129,20 @@ const initApp = () => {
       limit:    MAX_CLIP_SECONDS,
       behaviour:'drag',
       tooltips: {
-        to:   (value) => formatTime(value),
-        from: (value) => value
+        to:   (v) => formatTime(v),
+        from: (v) => v
       }
     });
 
     durationSlider.on('update', (values) => {
-      const clipDuration = values[1] - values[0];
-      durationValueLabel.textContent = `${clipDuration.toFixed(1)} сек`;
+      const clipDur = values[1] - values[0];
+      durationValueLabel.textContent = `${clipDur.toFixed(1)} сек`;
     });
   };
 
-  // --- Обработчики событий ---
-
-  fileInput.addEventListener('change', (event) => {
-    const file = event.target.files[0];
+  /* ─── Загрузка/инициализация видео ────────────────────────── */
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
     if (file && file.type.startsWith('video/')) {
       videoFile       = file;
       videoObjectURL  = URL.createObjectURL(videoFile);
@@ -145,25 +153,25 @@ const initApp = () => {
 
   videoPreview.addEventListener('loadedmetadata', () => {
     showPlayer();
-    videoPreview.muted = false;
-    videoOverlay.classList.remove('hidden');
-    updateScrubberHandle(0, videoPreview.duration);
-    initDurationSlider(videoPreview.duration);
     updateCurrentTime();
+    initDurationSlider(videoPreview.duration);
     convertButton.disabled = false;
+    applyTransform();
+    updateScrubberHandle(videoPreview.currentTime, videoPreview.duration); 
   });
 
-  videoPreview.addEventListener('timeupdate', () => {          // :contentReference[oaicite:2]{index=2}
+  /* ─── Обновление времени и дуги во время воспроизведения ─── */
+  videoPreview.addEventListener('timeupdate', () => {
     if (!isScrubbing) {
       updateScrubberHandle(videoPreview.currentTime, videoPreview.duration);
       updateCurrentTime();
     }
   });
 
+  /* ─── Клик = play/pause ───────────────────────────────────── */
   videoPreview.addEventListener('click', () => {
     videoPreview.paused ? videoPreview.play() : videoPreview.pause();
   });
-
   videoPreview.addEventListener('play',  () => videoOverlay.classList.add('hidden'));
   videoPreview.addEventListener('pause', () => videoOverlay.classList.remove('hidden'));
 
@@ -174,75 +182,93 @@ const initApp = () => {
     updateRangeFill(sizeSlider);
   });
 
-  // --- Логика кругового скраббера ---
-  const handleScrub = (event) => {
+  /* ─── Круговой скраббер ───────────────────── */
+  const startScrub = (event) => {
+    isScrubbing = true;
+    videoPreview.pause();
+    moveScrub(event);
+    document.addEventListener('mousemove', moveScrub);
+    document.addEventListener('touchmove', moveScrub);
+    document.addEventListener('mouseup',   endScrub);
+    document.addEventListener('touchend',  endScrub);
+    document.addEventListener('mouseleave',endScrub);
+  };
+
+  const moveScrub = (event) => {
     event.preventDefault();
-    const rect    = videoPreview.closest('.video-container').getBoundingClientRect();
-    const centerX = rect.left + rect.width  / 2;
-    const centerY = rect.top  + rect.height / 2;
+    const rect = videoPreview.closest('.video-container').getBoundingClientRect();
+    const cx = rect.left + rect.width  / 2;
+    const cy = rect.top  + rect.height / 2;
 
-    let clientX, clientY;
-    if (event.touches) {
-      clientX = event.touches[0].clientX;
-      clientY = event.touches[0].clientY;
-    } else {
-      clientX = event.clientX;
-      clientY = event.clientY;
-    }
+    const p  = event.touches ? event.touches[0] : event;
+    const dx = p.clientX - cx;
+    const dy = p.clientY - cy;
+    let angle = Math.atan2(dy, dx) * 180 / Math.PI + 75;
+    if (angle < 0) angle += 360;
 
-    // [ИЗМЕНЕНИЕ] Новая, точная математика
-    let angleDeg = Math.atan2(clientY - centerY, clientX - centerX) * 180 / Math.PI;
+    if (angle > 330) angle = angle - 330 < 360 - angle ? 330 : 0;
 
-    // Сдвигаем систему координат так, чтобы начало дуги (-75deg) стало 0
-    let normalizedAngle = angleDeg + 75;
-    if (normalizedAngle < 0) normalizedAngle += 360;
-
-    // Проверка «мертвой зоны» (разрыва)
-    const deadZoneStart = 330;
-    if (normalizedAngle > deadZoneStart) {
-      const distToStart  = normalizedAngle - deadZoneStart;
-      const distToEnd    = 360 - normalizedAngle;
-      normalizedAngle    = distToStart < distToEnd ? 330 : 0;
-    }
-
-    const progress = normalizedAngle / 330;
-    const newTime  = progress * videoPreview.duration;
-
-    videoPreview.currentTime = newTime;
-    updateScrubberHandle(newTime, videoPreview.duration);
+    const progress = angle / 330;
+    videoPreview.currentTime = progress * videoPreview.duration;
+    updateScrubberHandle(videoPreview.currentTime, videoPreview.duration);
     updateCurrentTime();
   };
 
-  const startScrubbing = (event) => {
-    isScrubbing = true;
-    videoPreview.pause();
-    handleScrub(event);
-    document.addEventListener('mousemove', handleScrub);
-    document.addEventListener('touchmove', handleScrub);
-    document.addEventListener('mouseup', stopScrubbing);
-    document.addEventListener('touchend', stopScrubbing);
-    document.addEventListener('mouseleave', stopScrubbing);
-  };
-
-  const stopScrubbing = () => {
-    if (!isScrubbing) return;
+  const endScrub = () => {
     isScrubbing = false;
-    document.removeEventListener('mousemove', handleScrub);
-    document.removeEventListener('touchmove', handleScrub);
-    document.removeEventListener('mouseup', stopScrubbing);
-    document.removeEventListener('touchend', stopScrubbing);
-    document.removeEventListener('mouseleave', stopScrubbing);
+    document.removeEventListener('mousemove', moveScrub);
+    document.removeEventListener('touchmove', moveScrub);
+    document.removeEventListener('mouseup',   endScrub);
+    document.removeEventListener('touchend',  endScrub);
+    document.removeEventListener('mouseleave',endScrub);
   };
 
-  scrubberHandle.addEventListener('mousedown', startScrubbing);
-  scrubberHandle.addEventListener('touchstart', startScrubbing);
+  scrubberHandle.addEventListener('mousedown', startScrub);
+  scrubberHandle.addEventListener('touchstart', startScrub, { passive:false });
 
-  // --- Первоначальная инициализация ---
+  /* ─── Зум при перетягивании resize-кнопки ───────────── */
+  let isResizing  = false;
+  let startY      = 0;
+  let startScale  = 1;
+
+  const onResizeStart = (e) => {
+    e.preventDefault();
+    const p = e.touches ? e.touches[0] : e;
+    isResizing = true;
+    startY     = p.clientY;
+    startScale = scale;
+    document.addEventListener('pointermove', onResizeMove);
+    document.addEventListener('pointerup',   onResizeEnd);
+  };
+
+  const onResizeMove = (e) => {
+    if (!isResizing) return;
+    const p = e.touches ? e.touches[0] : e;
+    const deltaY  = p.clientY - startY;
+    const newScale = clamp(
+      startScale - deltaY * SCALE_SENSITIVITY,
+      MIN_SCALE,
+      MAX_SCALE
+    );
+    if (newScale !== scale) {
+      scale = newScale;
+      applyTransform();
+    }
+  };
+
+  const onResizeEnd = () => {
+    isResizing = false;
+    document.removeEventListener('pointermove', onResizeMove);
+    document.removeEventListener('pointerup',   onResizeEnd);
+  };
+
+  resizeButton.addEventListener('pointerdown', onResizeStart);
+  resizeButton.addEventListener('touchstart',  onResizeStart, { passive:false });
+
+  /* ─── Старт ───────────────────────────────────────────────── */
   showUploader();
 };
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
-} else {
-  initApp();
-}
+document.readyState === 'loading'
+  ? document.addEventListener('DOMContentLoaded', initApp)
+  : initApp();
