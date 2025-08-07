@@ -3,54 +3,62 @@ const initApp = () => {
   const MAX_CLIP_SECONDS = 60;
 
   // --- DOM элементы ---
-  const fileInput = document.getElementById('fileInput');
+  const fileInput        = document.getElementById('fileInput');
   const touchMeContainer = document.getElementById('touchMeContainer');
-  const playerWrapper = document.getElementById('playerWrapper');
-  const videoPreview = document.getElementById('videoPreview');
-  const videoOverlay = document.getElementById('videoOverlay');
-  const deleteButton = document.getElementById('deleteButton');
-  const convertButton = document.getElementById('convertButton');
+  const playerWrapper    = document.getElementById('playerWrapper');
+  const videoPreview     = document.getElementById('videoPreview');
+  const videoOverlay     = document.getElementById('videoOverlay');
+  const deleteButton     = document.getElementById('deleteButton');
+  const convertButton    = document.getElementById('convertButton');
 
-  // Элементы управления
-  const scrubberHandle = document.getElementById('scrubberHandle');
+  // элементы управления
+  const scrubberHandle   = document.getElementById('scrubberHandle');
   const scrubberProgress = document.getElementById('scrubberProgress');
-  let scrubberPathLength = 0;
+  let   scrubberPathLength = 0;
   if (scrubberProgress) {
-    scrubberPathLength = scrubberProgress.getTotalLength();
-    scrubberProgress.style.strokeDasharray = scrubberPathLength;
+    scrubberPathLength                 = scrubberProgress.getTotalLength();
+    scrubberProgress.style.strokeDasharray  = scrubberPathLength;
     scrubberProgress.style.strokeDashoffset = scrubberPathLength;
   }
-  const durationSliderEl = document.getElementById('durationSlider');
+  const durationSliderEl   = document.getElementById('durationSlider');
   const durationValueLabel = document.getElementById('durationValueLabel');
-  const sizeSlider = document.getElementById('sizeSlider');
-  const sizeOut = document.getElementById('sizeOut');
+  const sizeSlider         = document.getElementById('sizeSlider');
+  const sizeOut            = document.getElementById('sizeOut');
 
-  if (!fileInput || !scrubberHandle || !durationSliderEl) {
+  // новый элемент – вывод текущего времени
+  const currentTimeSpan = document.querySelector('#currentTime span');  // :contentReference[oaicite:0]{index=0}
+
+  if (!fileInput || !scrubberHandle || !durationSliderEl || !currentTimeSpan) {
     console.error('Критическая ошибка: один или несколько HTML-элементов не найдены.');
     return;
   }
 
   // --- Переменные состояния ---
-  let videoFile = null;
-  let videoObjectURL = null;
-  let durationSlider = null;
-  let isScrubbing = false;
+  let videoFile       = null;
+  let videoObjectURL  = null;
+  let durationSlider  = null;
+  let isScrubbing     = false;
 
   // --- Хелперы ---
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds) => {          // :contentReference[oaicite:1]{index=1}
     const min = Math.floor(seconds / 60);
     const sec = Math.floor(seconds % 60);
     return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   };
 
+  const updateCurrentTime = () => {
+    currentTimeSpan.textContent = formatTime(videoPreview.currentTime);
+  };
+
   const updateRangeFill = (slider) => {
-    const min = slider.min || 0;
-    const max = slider.max || 100;
-    const value = slider.value;
+    const min        = slider.min || 0;
+    const max        = slider.max || 100;
+    const value      = slider.value;
     const percentage = ((value - min) / (max - min)) * 100;
     const sliderColor = '#606680';
-    slider.style.background = `(to right, ${sliderColor} ${percentage}%, #E0E1E6 ${percentage}%)`;
+    slider.style.background =
+      `(to right, ${sliderColor} ${percentage}%, #E0E1E6 ${percentage}%)`;
   };
 
   /** [ИЗМЕНЕНИЕ] Новая, точная математика для позиционирования дотика на дуге */
@@ -58,7 +66,7 @@ const initApp = () => {
     if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(time)) return;
 
     const progress = Math.max(0, Math.min(1, time / duration));
-    const angle = -75 + (progress * 330);
+    const angle    = -75 + (progress * 330);
 
     const x = 100 + 90 * Math.cos(angle * Math.PI / 180);
     const y = 100 + 90 * Math.sin(angle * Math.PI / 180);
@@ -81,37 +89,38 @@ const initApp = () => {
     if (videoObjectURL) URL.revokeObjectURL(videoObjectURL);
     if (durationSlider) durationSlider.destroy();
 
-    videoPreview.src = '';
-    videoObjectURL = null;
-    videoFile = null;
-    fileInput.value = '';
-    durationSlider = null;
+    videoPreview.src  = '';
+    videoObjectURL    = null;
+    videoFile         = null;
+    fileInput.value   = '';
+    durationSlider    = null;
 
-    sizeSlider.value = 640;
+    sizeSlider.value  = 640;
     sizeOut.textContent = sizeSlider.value;
     updateRangeFill(sizeSlider);
 
     convertButton.disabled = true;
     playerWrapper.classList.add('hidden');
     touchMeContainer.classList.remove('hidden');
+    currentTimeSpan.textContent = '00:00';
   };
 
   // --- Инициализация элементов управления ---
 
   const initDurationSlider = (videoDuration) => {
     const start = 0;
-    const end = Math.min(videoDuration, MAX_CLIP_SECONDS);
+    const end   = Math.min(videoDuration, MAX_CLIP_SECONDS);
 
     if (durationSlider) durationSlider.destroy();
 
     durationSlider = noUiSlider.create(durationSliderEl, {
-      start: [start, end],
-      connect: true,
-      range: { min: 0, max: videoDuration },
-      limit: MAX_CLIP_SECONDS,
-      behaviour: 'drag',
+      start:    [start, end],
+      connect:  true,
+      range:    { min: 0, max: videoDuration },
+      limit:    MAX_CLIP_SECONDS,
+      behaviour:'drag',
       tooltips: {
-        to: (value) => formatTime(value),
+        to:   (value) => formatTime(value),
         from: (value) => value
       }
     });
@@ -127,8 +136,8 @@ const initApp = () => {
   fileInput.addEventListener('change', (event) => {
     const file = event.target.files[0];
     if (file && file.type.startsWith('video/')) {
-      videoFile = file;
-      videoObjectURL = URL.createObjectURL(videoFile);
+      videoFile       = file;
+      videoObjectURL  = URL.createObjectURL(videoFile);
       videoPreview.src = videoObjectURL;
       videoPreview.load();
     }
@@ -140,12 +149,14 @@ const initApp = () => {
     videoOverlay.classList.remove('hidden');
     updateScrubberHandle(0, videoPreview.duration);
     initDurationSlider(videoPreview.duration);
+    updateCurrentTime();
     convertButton.disabled = false;
   });
 
-  videoPreview.addEventListener('timeupdate', () => {
+  videoPreview.addEventListener('timeupdate', () => {          // :contentReference[oaicite:2]{index=2}
     if (!isScrubbing) {
       updateScrubberHandle(videoPreview.currentTime, videoPreview.duration);
+      updateCurrentTime();
     }
   });
 
@@ -153,7 +164,7 @@ const initApp = () => {
     videoPreview.paused ? videoPreview.play() : videoPreview.pause();
   });
 
-  videoPreview.addEventListener('play', () => videoOverlay.classList.add('hidden'));
+  videoPreview.addEventListener('play',  () => videoOverlay.classList.add('hidden'));
   videoPreview.addEventListener('pause', () => videoOverlay.classList.remove('hidden'));
 
   deleteButton.addEventListener('click', showUploader);
@@ -163,14 +174,12 @@ const initApp = () => {
     updateRangeFill(sizeSlider);
   });
 
-
   // --- Логика кругового скраббера ---
-
   const handleScrub = (event) => {
     event.preventDefault();
-    const rect = videoPreview.closest('.video-container').getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+    const rect    = videoPreview.closest('.video-container').getBoundingClientRect();
+    const centerX = rect.left + rect.width  / 2;
+    const centerY = rect.top  + rect.height / 2;
 
     let clientX, clientY;
     if (event.touches) {
@@ -181,33 +190,27 @@ const initApp = () => {
       clientY = event.clientY;
     }
 
-    // [ИЗМЕНЕНИЕ] Новая, точная математика для определения прогресса по клику
+    // [ИЗМЕНЕНИЕ] Новая, точная математика
     let angleDeg = Math.atan2(clientY - centerY, clientX - centerX) * 180 / Math.PI;
 
     // Сдвигаем систему координат так, чтобы начало дуги (-75deg) стало 0
     let normalizedAngle = angleDeg + 75;
-    if (normalizedAngle < 0) {
-      normalizedAngle += 360;
-    }
+    if (normalizedAngle < 0) normalizedAngle += 360;
 
-    // Определяем, находится ли клик в "мертвой зоне" (разрыве)
-    const deadZoneStart = 330; // Конец нашей дуги
+    // Проверка «мертвой зоны» (разрыва)
+    const deadZoneStart = 330;
     if (normalizedAngle > deadZoneStart) {
-      // Если клик в мертвой зоне, определяем, к какому концу дуги он ближе
-      const distToStart = normalizedAngle - deadZoneStart; // Расстояние до начала разрыва
-      const distToEnd = 360 - normalizedAngle; // Расстояние до конца разрыва
-      if (distToStart < distToEnd) {
-        normalizedAngle = 330; // Ближе к концу дуги
-      } else {
-        normalizedAngle = 0; // Ближе к началу дуги
-      }
+      const distToStart  = normalizedAngle - deadZoneStart;
+      const distToEnd    = 360 - normalizedAngle;
+      normalizedAngle    = distToStart < distToEnd ? 330 : 0;
     }
 
     const progress = normalizedAngle / 330;
-    const newTime = progress * videoPreview.duration;
+    const newTime  = progress * videoPreview.duration;
 
     videoPreview.currentTime = newTime;
     updateScrubberHandle(newTime, videoPreview.duration);
+    updateCurrentTime();
   };
 
   const startScrubbing = (event) => {
