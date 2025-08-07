@@ -50,18 +50,22 @@ h1 {
 }
 
 /* --- Начальный экран --- */
-#touchMeContainer {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+/* ИЗМЕНЕНИЕ: Задаем общие правила для контейнеров первого и второго экрана */
+#touchMeContainer,
+.video-area {
+  width: 100%;
+  max-width: 380px; /* Ограничиваем макс. ширину для консистентности */
+  margin: 0 auto;  /* Центрируем блок */
 }
 
 .touch-me-label {
-  width: 360px;
-  height: 360px;
+  /* ИЗМЕНЕНИЕ: Убраны фиксированные размеры. Теперь кнопка адаптивная. */
+  position: relative; /* Необходимо для позиционирования текста */
+  display: flex;
+  width: 100%;
+  padding-top: 100%; /* Трюк для создания квадрата, который станет кругом */
   border-radius: 50%;
   background: var(--bg);
-  display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
@@ -78,6 +82,11 @@ h1 {
 }
 
 .touch-me-label span {
+  /* ИЗМЕНЕНИЕ: Текст теперь абсолютно спозиционирован внутри круга */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   font-size: 2.9rem;
   font-weight: 200;
   color: var(--bg);
@@ -148,11 +157,11 @@ h1 {
   height: 30%;
 }
 
-.delete-button {
+.delete-button,
+.resize-button,
+.move-button,
+.current-time {
   position: absolute;
-  top: 90%;
-  right: 0;
-  transform: translate(-5%, -35%);
   width: 54px;
   height: 54px;
   background: var(--bg);
@@ -161,13 +170,21 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
   z-index: 10;
 }
 
-.delete-button:active {
+.delete-button:active,
+.resize-button:active,
+.move-button:active {
   box-shadow: inset -2px -2px 4px var(--sh-light), inset 2px 2px 4px var(--sh-dark);
+}
+
+.delete-button {
+  top: 90%;
+  right: 0;
+  transform: translate(-5%, -35%);
+  cursor: pointer;
 }
 
 .delete-button svg {
@@ -177,40 +194,18 @@ h1 {
 }
 
 .current-time {
-  position: absolute;
   top: 5%;
   right: 0;
   transform: translate(-5%, -35%);
-  width: 54px;
-  height: 54px;
-  background: var(--bg);
-  border: none;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: default;
-  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
-  z-index: 10;
-  font-size: 1rem;
+  font-size: 0.9rem;
 }
 
 .resize-button {
-  position: absolute;
   top: 90%;
   left: 2%;
   transform: translate(-5%, -35%);
-  width: 54px;
-  height: 54px;
-  background: var(--bg);
-  border: none;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: ns-resize;
-  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
-  z-index: 10;
 }
 
 .resize-button svg {
@@ -220,21 +215,10 @@ h1 {
 }
 
 .move-button {
-  position: absolute;
   top: 5%;
   left: 2%;
   transform: translate(-5%, -35%);
-  width: 54px;
-  height: 54px;
-  background: var(--bg);
-  border: none;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: move;
-  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
-  z-index: 10;
 }
 
 .move-button svg {
@@ -290,7 +274,7 @@ h1 {
 
 .control-group {
   margin-bottom: 1rem;
-  position: relative; /* Необходимо для позиционирования новой подсказки */
+  position: relative;
 }
 
 .resolution-group {
@@ -435,12 +419,10 @@ input[type=text] {
   transform: translate(0, 0);
 }
 
-/* ДОБАВЛЕННЫЙ СТИЛЬ: для скрытия стандартных подсказок */
 .noUi-tooltip.hidden {
   display: none;
 }
 
-/* ДОБАВЛЕННЫЙ СТИЛЬ: для новой объединенной подсказки */
 .combined-tooltip {
     position: absolute;
     bottom: -90%;
@@ -507,5 +489,51 @@ input[type=range]::-moz-range-thumb {
     padding: 1.5rem 1.2rem calc(2rem + env(safe-area-inset-bottom));
     border-radius: 0;
     box-shadow: none;
+  }
+
+  /* ИЗМЕНЕНИЕ: Увеличение кнопок и изменение их положения на мобильных */
+  .delete-button,
+  .resize-button,
+  .move-button,
+  .current-time {
+    width: 60px;
+    height: 60px;
+  }
+
+  .move-button {
+    top: 10%;
+    left: 10%;
+    transform: translate(-50%, -50%);
+  }
+  
+  .current-time {
+    top: 10%;
+    right: 10%;
+    transform: translate(50%, -50%);
+  }
+
+  .resize-button {
+    bottom: 10%;
+    left: 10%;
+    top: auto; /* Сбрасываем top */
+    transform: translate(-50%, 50%);
+  }
+
+  .delete-button {
+    bottom: 10%;
+    right: 10%;
+    top: auto; /* Сбрасываем top */
+    transform: translate(50%, 50%);
+  }
+  
+  .move-button svg, 
+  .resize-button svg {
+    width: 38px;
+    height: 38px;
+  }
+  
+  .delete-button svg {
+    width: 30px;
+    height: 30px;
   }
 }
