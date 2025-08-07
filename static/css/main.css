@@ -127,9 +127,8 @@ h1 {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 60px;
-  height: 60px;
-  background: rgba(0, 0, 0, 0.4);
+  width: 300px;
+  height: 300px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -139,10 +138,7 @@ h1 {
 }
 
 .play-icon {
-  width: 50%;
-  height: 50%;
-  fill: #fff;
-  margin-left: 5px;
+  fill: #ffffffa3;
 }
 
 .delete-button {
@@ -159,17 +155,80 @@ h1 {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: -4px -4px 8px var(--sh-light), 4px 4px 8px var(--sh-dark);
+  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
 }
 
 .delete-button:active {
-  box-shadow: inset -3px -3px 6px var(--sh-light), inset 3px 3px 6px var(--sh-dark);
+  box-shadow: inset -2px -2px 4px var(--sh-light), inset 2px 2px 4px var(--sh-dark);
 }
 
 .delete-button svg {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   fill: var(--red);
+}
+
+.current-time {
+  position: absolute;
+  top: 5%;
+  right: 0;
+  transform: translate(-5%, -35%);
+  width: 54px;
+  height: 54px;
+  background: var(--bg);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
+}
+
+.resize-button {
+  position: absolute;
+  top: 90%;
+  left: 2%;
+  transform: translate(-5%, -35%);
+  width: 54px;
+  height: 54px;
+  background: var(--bg);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
+}
+
+.resize-button svg {
+  width: 44px;
+  height: 44px;
+  fill: var(--accent);
+}
+
+.move-button {
+  position: absolute;
+  top: 5%;
+  left: 2%;
+  transform: translate(-5%, -35%);
+  width: 54px;
+  height: 54px;
+  background: var(--bg);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
+}
+
+.move-button svg {
+  width: 44px;
+  height: 44px;
+  fill: var(--accent);
 }
 
 .scrubber-svg {
@@ -206,7 +265,8 @@ h1 {
   fill: none;
   stroke: #606680;
   stroke-width: 4;
-  stroke-dasharray: 1000; /* временное значение, будет заменено в JS */
+  stroke-dasharray: 1000;
+  /* временное значение, будет заменено в JS */
   stroke-dashoffset: 1000;
   transition: stroke-dashoffset 0.1s linear;
   pointer-events: none;
@@ -243,27 +303,31 @@ input[type=text] {
   color: var(--font-color);
   margin-bottom: 0.8rem;
   background: var(--bg);
-  box-shadow: inset -6px -6px 12px var(--sh-light), inset 6px 6px 12px var(--sh-dark);
+  box-shadow: inset -2px -2px 4px var(--sh-light), inset 2px 2px 4px var(--sh-dark);
 }
 
 #convertButton {
   width: 100%;
-  padding: 1rem;
+  padding: 0.8rem;
   border: none;
   border-radius: var(--radius-m);
-  font-size: 1rem;
-  margin-bottom: 0.8rem;
-  font-weight: 600;
+  font-size: 20px;
+  margin: 1.5rem 0 0.8rem 0;
+  font-weight: 400;
   cursor: pointer;
-  transition: all 0.2s ease;
-  background: var(--accent);
-  color: #fff;
-  box-shadow: -4px -4px 8px var(--sh-light), 4px 4px 8px var(--sh-dark);
+  /* transition: all 0.2s ease; */
+  background: var(--bg);
+  color: var(--accent);
+  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
+}
+
+#convertButton:hover {
+  filter: brightness(1.02);
 }
 
 #convertButton:active {
-  transform: translateY(2px);
-  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
+  /* font-size: 19.5px; */
+  box-shadow: inset -2px -2px 4px var(--sh-light), inset 2px 2px 4px var(--sh-dark);
 }
 
 #convertButton:disabled {
@@ -317,7 +381,7 @@ input[type=text] {
   border-radius: 50%;
   border: none;
   background: var(--bg);
-  box-shadow: -3px -3px 6px var(--sh-light), 3px 3px 6px var(--sh-dark);
+  box-shadow: -1px -1px 2px var(--sh-light), 1px 1px 2px var(--sh-dark);
   cursor: pointer;
 }
 
@@ -330,9 +394,7 @@ input[type=text] {
   width: 24px;
   height: 24px;
   top: -8px;
-  /* [ИЗМЕНЕНИЕ] Убираем позиционирование через right, т.к. padding делает всю работу */
   right: -12px;
-  /* Это позиционирует ЦЕНТР ручки. С padding это теперь правильно. */
 }
 
 .noUi-tooltip {
@@ -357,14 +419,19 @@ input[type=text] {
 
 /* --- Новые точные позиции под каждую ручку --- */
 .noUi-horizontal .noUi-handle-lower .noUi-tooltip {
-  left: 0;                              /* левый край = левому краю ручки */
-  transform: translate(0, 0);       /* без смещения по X */
+  left: 0;
+  /* левый край = левому краю ручки */
+  transform: translate(0, 0);
+  /* без смещения по X */
 }
 
 .noUi-horizontal .noUi-handle-upper .noUi-tooltip {
-  right: 0;                             /* правый край = правому краю ручки */
-  left: auto;                           /* выключаем наследованный left */
-  transform: translate(0, 0);        /* без смещения по X */
+  right: 0;
+  /* правый край = правому краю ручки */
+  left: auto;
+  /* выключаем наследованный left */
+  transform: translate(0, 0);
+  /* без смещения по X */
 }
 
 input[type=range] {
