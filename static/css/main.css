@@ -50,20 +50,18 @@ h1 {
 }
 
 /* --- Начальный экран --- */
-/* ИЗМЕНЕНИЕ: Задаем общие правила для контейнеров первого и второго экрана */
 #touchMeContainer,
 .video-area {
   width: 100%;
-  max-width: 380px; /* Ограничиваем макс. ширину для консистентности */
-  margin: 0 auto;  /* Центрируем блок */
+  max-width: 380px;
+  margin: 0 auto;
 }
 
 .touch-me-label {
-  /* ИЗМЕНЕНИЕ: Убраны фиксированные размеры. Теперь кнопка адаптивная. */
-  position: relative; /* Необходимо для позиционирования текста */
+  position: relative;
   display: flex;
   width: 100%;
-  padding-top: 100%; /* Трюк для создания квадрата, который станет кругом */
+  padding-top: 100%;
   border-radius: 50%;
   background: var(--bg);
   justify-content: center;
@@ -82,7 +80,6 @@ h1 {
 }
 
 .touch-me-label span {
-  /* ИЗМЕНЕНИЕ: Текст теперь абсолютно спозиционирован внутри круга */
   position: absolute;
   top: 50%;
   left: 50%;
@@ -491,7 +488,12 @@ input[type=range]::-moz-range-thumb {
     box-shadow: none;
   }
 
-  /* ИЗМЕНЕНИЕ: Увеличение кнопок и изменение их положения на мобильных */
+  /* ИЗМЕНЕНИЕ: Снимаем ограничение по ширине для контейнеров на мобильных */
+  #touchMeContainer,
+  .video-area {
+    max-width: none;
+  }
+
   .delete-button,
   .resize-button,
   .move-button,
@@ -515,14 +517,14 @@ input[type=range]::-moz-range-thumb {
   .resize-button {
     bottom: 10%;
     left: 10%;
-    top: auto; /* Сбрасываем top */
+    top: auto;
     transform: translate(-50%, 50%);
   }
 
   .delete-button {
     bottom: 10%;
     right: 10%;
-    top: auto; /* Сбрасываем top */
+    top: auto;
     transform: translate(50%, 50%);
   }
   
