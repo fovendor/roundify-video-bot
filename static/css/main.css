@@ -1,12 +1,14 @@
 :root {
-  --bg: #ecedf1;
-  --sh-dark: #b3b3b3;
-  --sh-light: #ffffff;
-  --accent: #3A4D6F;
-  --accent-slider: #606680;
-  --accent-disabled: #b0b6c2;
-  --red: #e74c3c;
-  --font-color: #555;
+  --bg: #1e1f26;
+  --surface: #2a2d35;
+  --surface-inset: #16171c;
+  --sh-dark: #121317;
+  --sh-light: #2a2b31;
+  --accent: #ff7060;
+  /* Оранжево-красный акцент */
+  --accent-glow: #ff706080;
+  --font-color: #d0d1d6;
+  --font-color-muted: #6a6d78;
   --radius-l: 1.5rem;
   --radius-m: 1rem;
 }
@@ -33,25 +35,23 @@ body {
 }
 
 .card {
-  background: var(--bg);
+  background: var(--surface);
   padding: 2rem;
   border-radius: var(--radius-l);
-  box-shadow: -5px -5px 10px var(--sh-light), 5px 5px 10px var(--sh-dark);
   width: clamp(320px, 90vw, 420px);
-  transition: all 0.5s ease;
+  box-shadow: 10px 10px 20px var(--sh-dark), -10px -10px 20px var(--sh-light);
 }
 
 h1 {
   margin: 0 0 2rem;
   text-align: center;
   font-size: 2rem;
-  font-weight: 400;
-  color: var(--accent);
+  font-weight: 600;
+  color: var(--font-color);
 }
 
 /* --- Начальный экран --- */
-#touchMeContainer,
-.video-area {
+#uploadScreen {
   width: 100%;
   max-width: 380px;
   margin: 0 auto;
@@ -63,20 +63,20 @@ h1 {
   width: 100%;
   padding-top: 100%;
   border-radius: 50%;
-  background: var(--bg);
+  background: var(--surface);
   justify-content: center;
   align-items: center;
   cursor: pointer;
-  box-shadow: -5px -5px 10px var(--sh-light), 5px 5px 10px var(--sh-dark);
+  box-shadow: inset 8px 8px 16px var(--sh-dark), inset -8px -8px 16px var(--sh-light);
   transition: all 0.15s linear;
 }
 
 .touch-me-label:hover {
-  filter: brightness(1.02);
+  filter: brightness(1.1);
 }
 
 .touch-me-label:active {
-  box-shadow: inset -5px -5px 10px var(--sh-light), inset 5px 5px 10px var(--sh-dark);
+  box-shadow: inset 10px 10px 20px var(--sh-dark), inset -10px -10px 20px var(--sh-light);
 }
 
 .touch-me-label span {
@@ -84,30 +84,26 @@ h1 {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 2.9rem;
-  font-weight: 200;
-  color: var(--bg);
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--font-color-muted);
   text-align: center;
   line-height: 1.2;
   user-select: none;
-  text-shadow: 1px 1px 2px var(--sh-dark), -1px -1px 2px var(--sh-light);
+  text-transform: uppercase;
 }
-
-.touch-me-label:active span {
-  font-size: 2.8rem;
-  text-shadow: 1px 1px 3px var(--sh-dark), -1px -1px 3px var(--sh-light);
-}
-
 
 /* --- Экран плеера --- */
-.player-wrapper {
+#playerScreen {
   display: flex;
   flex-direction: column;
 }
 
 .video-area {
   position: relative;
-  margin-bottom: 2rem;
+  width: 100%;
+  max-width: 380px;
+  margin: 0 auto;
 }
 
 .video-container {
@@ -115,8 +111,8 @@ h1 {
   width: 100%;
   padding-top: 100%;
   border-radius: 50%;
-  background-color: var(--bg);
-  box-shadow: inset -8px -8px 16px var(--sh-light), inset 8px 8px 16px var(--sh-dark);
+  background: var(--bg);
+  box-shadow: 10px 10px 20px var(--sh-dark), -10px -10px 20px var(--sh-light);
   overflow: hidden;
 }
 
@@ -128,7 +124,6 @@ h1 {
   height: 100%;
   object-fit: cover;
   transform: scale(1);
-  transition: transform .1s ease-out;
   background-color: #000;
   cursor: pointer;
 }
@@ -146,84 +141,16 @@ h1 {
   justify-content: center;
   pointer-events: none;
   transition: opacity 0.2s ease;
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .play-icon {
-  fill: #ffffffa3;
+  fill: rgba(255, 255, 255, 0.7);
   width: 30%;
   height: 30%;
 }
 
-.delete-button,
-.resize-button,
-.move-button,
-.current-time {
-  position: absolute;
-  width: 54px;
-  height: 54px;
-  background: var(--bg);
-  border: none;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
-  z-index: 10;
-}
-
-.delete-button:active,
-.resize-button:active,
-.move-button:active {
-  box-shadow: inset -2px -2px 4px var(--sh-light), inset 2px 2px 4px var(--sh-dark);
-}
-
-.delete-button {
-  top: 90%;
-  right: 0;
-  transform: translate(-5%, -35%);
-  cursor: pointer;
-}
-
-.delete-button svg {
-  width: 32px;
-  height: 32px;
-  fill: var(--red);
-}
-
-.current-time {
-  top: 5%;
-  right: 0;
-  transform: translate(-5%, -35%);
-  cursor: default;
-  font-size: 0.9rem;
-}
-
-.resize-button {
-  top: 90%;
-  left: 2%;
-  transform: translate(-5%, -35%);
-  cursor: ns-resize;
-}
-
-.resize-button svg {
-  width: 44px;
-  height: 44px;
-  fill: var(--accent);
-}
-
-.move-button {
-  top: 5%;
-  left: 2%;
-  transform: translate(-5%, -35%);
-  cursor: move;
-}
-
-.move-button svg {
-  width: 44px;
-  height: 44px;
-  fill: var(--accent);
-}
-
+/* --- Круговой скраббер (финальная версия) --- */
 .scrubber-svg {
   position: absolute;
   top: 0;
@@ -231,51 +158,97 @@ h1 {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  overflow: visible;
+  /* Чтобы тень от дотика не обрезалась */
 }
 
-.scrubber-track {
+.scrubber-track-bg,
+.scrubber-track-fg {
   fill: none;
-  stroke: #e0e1e6;
-  stroke-width: 4;
-}
-
-.scrubber-handle {
-  fill: #fff;
-  stroke: rgba(0, 0, 0, 0.2);
-  stroke-width: 1;
-  cursor: pointer;
-  pointer-events: all;
-  r: 9;
+  stroke-linecap: round;
+  /* Скругляем концы дуги */
+  stroke-width: 8;
 }
 
 .scrubber-track-bg {
-  fill: none;
-  stroke: #e0e1e6;
-  stroke-width: 4;
+  stroke: rgba(0, 0, 0, 0.2);
 }
 
 .scrubber-track-fg {
-  fill: none;
-  stroke: #606680;
-  stroke-width: 4;
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 1000;
+  stroke: var(--accent);
+  filter: drop-shadow(0 0 5px var(--accent-glow));
   transition: stroke-dashoffset 0.1s linear;
-  pointer-events: none;
+}
+
+.scrubber-handle {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 4;
+  r: 10;
+  filter: drop-shadow(0 2px 4px var(--sh-dark));
+  pointer-events: all;
+  cursor: pointer;
+}
+
+
+/* --- Новая панель инструментов --- */
+.tool-controls {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin: 2rem auto 0;
+  width: 100%;
+  max-width: 380px;
+}
+
+.tool-button,
+.time-display {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 5px 5px 10px var(--sh-dark), -5px -5px 10px var(--sh-light);
+  transition: all 0.15s ease-out;
+}
+
+.tool-button {
+  cursor: pointer;
+}
+
+.tool-button:active {
+  box-shadow: inset 5px 5px 10px var(--sh-dark), inset -5px -5px 10px var(--sh-light);
+  transform: scale(0.95);
+}
+
+.tool-button svg {
+  fill: var(--font-color-muted);
+  width: 24px;
+  height: 24px;
+  transition: fill 0.15s;
+}
+
+.tool-button:hover svg {
+  fill: var(--font-color);
+}
+
+.time-display {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--font-color-muted);
 }
 
 /* --- Элементы управления --- */
 .controls {
-  padding-top: 1rem;
+  margin-top: 2rem;
 }
 
 .control-group {
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
   position: relative;
-}
-
-.resolution-group {
-  margin-top: 2.8rem;
 }
 
 .label-container {
@@ -287,6 +260,10 @@ h1 {
   font-weight: 600;
 }
 
+.label-container span:last-child {
+  color: var(--font-color-muted);
+}
+
 input[type=text] {
   width: 100%;
   padding: 1rem;
@@ -294,82 +271,60 @@ input[type=text] {
   border-radius: var(--radius-m);
   font-size: 1rem;
   color: var(--font-color);
-  margin-bottom: 0.8rem;
-  background: var(--bg);
-  box-shadow: inset -2px -2px 4px var(--sh-light), inset 2px 2px 4px var(--sh-dark);
+  margin-top: 1.5rem;
+  background: var(--surface);
+  box-shadow: inset 5px 5px 10px var(--sh-dark), inset -5px -5px 10px var(--sh-light);
 }
 
 #convertButton {
   width: 100%;
-  padding: 0.8rem;
+  padding: 1rem;
   border: none;
   border-radius: var(--radius-m);
-  font-size: 20px;
-  margin: 1.5rem 0 0.8rem 0;
-  font-weight: 400;
+  font-size: 1.2rem;
+  margin-top: 2rem;
+  font-weight: 700;
   cursor: pointer;
-  background: var(--bg);
-  color: var(--accent);
-  box-shadow: -2px -2px 4px var(--sh-light), 2px 2px 4px var(--sh-dark);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 5px 5px 10px #4e1e1a, -5px -5px 10px #6a2a24;
+  transition: all 0.15s ease-out;
 }
 
 #convertButton:hover {
-  filter: brightness(1.02);
+  filter: brightness(1.1);
 }
 
 #convertButton:active {
-  box-shadow: inset -2px -2px 4px var(--sh-light), inset 2px 2px 4px var(--sh-dark);
+  transform: scale(0.98);
+  box-shadow: inset 5px 5px 10px #4e1e1a, inset -5px -5px 10px #6a2a24;
 }
 
 #convertButton:disabled {
-  color: var(--accent-disabled);
-  background: var(--bg);
-  box-shadow: inset -6px -6px 12px var(--sh-light), inset 6px 6px 12px var(--sh-dark);
+  background: var(--font-color-muted);
+  color: var(--surface);
+  box-shadow: none;
   cursor: not-allowed;
 }
 
-.btn-loader {
-  display: inline-block;
-  width: 1.2em;
-  height: 1.2em;
-  border: .15em solid #fff;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin .9s linear infinite;
-  vertical-align: middle;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* --- Стили для noUiSlider и range input --- */
+/* --- Стили для noUiSlider --- */
 .noUi-target {
-  background: #E0E1E6;
+  background: var(--surface-inset);
   border-radius: 5px;
   border: none;
-  box-shadow: inset -3px -3px 6px var(--sh-light), inset 3px 3px 6px var(--sh-dark);
+  box-shadow: inset 3px 3px 6px var(--sh-dark), inset -3px -3px 6px var(--sh-light);
   height: 8px;
-  position: relative;
-  padding: 0 12px;
-  box-sizing: border-box;
-}
-
-.noUi-connects {
-  margin: 0 -12px;
 }
 
 .noUi-connect {
-  background: var(--accent-slider);
+  background: var(--accent);
 }
 
 .noUi-handle {
   border-radius: 50%;
-  border: none;
-  background: var(--bg);
-  box-shadow: -1px -1px 2px var(--sh-light), 1px 1px 2px var(--sh-dark);
+  border: 3px solid var(--surface);
+  background: var(--accent);
+  box-shadow: 3px 3px 6px var(--sh-dark), -3px -3px 6px var(--sh-light);
   cursor: pointer;
 }
 
@@ -379,94 +334,60 @@ input[type=text] {
 }
 
 .noUi-horizontal .noUi-handle {
-  width: 24px;
-  height: 24px;
-  top: -8px;
-  right: -12px;
+  width: 22px;
+  height: 22px;
+  top: -7px;
+  right: -11px;
 }
 
 .noUi-tooltip {
-  position: absolute;
-  bottom: -28px;
-  left: 50%;
-  background: var(--accent-slider);
-  color: white;
-  font-weight: 400;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  transform: translateX(-50%);
-  transition: opacity 0.1s;
-  white-space: nowrap;
-  
-}
-
-.noUi-horizontal .noUi-tooltip {
-  bottom: -125%;
-}
-
-.noUi-horizontal .noUi-handle-lower .noUi-tooltip {
-  left: 0;
-  transform: translate(0, 0);
-}
-
-.noUi-horizontal .noUi-handle-upper .noUi-tooltip {
-  right: 0;
-  left: auto;
-  transform: translate(0, 0);
-}
-
-.noUi-tooltip.hidden {
   display: none;
 }
 
 .combined-tooltip {
-    position: absolute;
-    bottom: -90%;
-    background: var(--accent-slider);
-    color: white;
-    font-weight: 400;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    white-space: nowrap;
-    transform: translateX(-50%);
-    pointer-events: none;
-    transition: opacity 0.1s;
+  position: absolute;
+  bottom: 1.5rem;
+  background: var(--surface);
+  color: var(--font-color);
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: opacity 0.1s;
+  box-shadow: 3px 3px 6px var(--sh-dark);
 }
 
-
+/* --- Range Input --- */
 input[type=range] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
   height: 8px;
-  background: #E0E1E6;
+  background: transparent;
   outline: none;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+  height: 8px;
+  background: var(--surface-inset);
   border-radius: 5px;
-  box-shadow: inset -3px -3px 6px var(--sh-light), inset 3px 3px 6px var(--sh-dark);
+  box-shadow: inset 3px 3px 6px var(--sh-dark), inset -3px -3px 6px var(--sh-light);
 }
 
 input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
+  margin-top: -7px;
   border-radius: 50%;
-  background: var(--bg);
+  border: 3px solid var(--surface);
+  background: var(--font-color);
   cursor: pointer;
-  border: none;
-  box-shadow: -3px -3px 6px var(--sh-light), 3px 3px 6px var(--sh-dark);
-}
-
-input[type=range]::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--bg);
-  cursor: pointer;
-  border: none;
-  box-shadow: -3px -3px 6px var(--sh-light), 3px 3px 6px var(--sh-dark);
+  box-shadow: 3px 3px 6px var(--sh-dark), -3px -3px 6px var(--sh-light);
 }
 
 /* --- Вспомогательные классы --- */
@@ -474,68 +395,13 @@ input[type=range]::-moz-range-thumb {
   display: none !important;
 }
 
-/* --- Адаптация для мобильных устройств --- */
 @media(max-width:600px) {
-  body {
-    align-items: flex-start;
-  }
-
   .card {
     width: 100vw;
     min-height: 100dvh;
     padding: 1.5rem 1.2rem calc(2rem + env(safe-area-inset-bottom));
     border-radius: 0;
     box-shadow: none;
-  }
-
-  /* ИЗМЕНЕНИЕ: Снимаем ограничение по ширине для контейнеров на мобильных */
-  #touchMeContainer,
-  .video-area {
-    max-width: none;
-  }
-
-  .delete-button,
-  .resize-button,
-  .move-button,
-  .current-time {
-    width: 60px;
-    height: 60px;
-  }
-
-  .move-button {
-    top: 10%;
-    left: 10%;
-    transform: translate(-50%, -50%);
-  }
-  
-  .current-time {
-    top: 10%;
-    right: 10%;
-    transform: translate(50%, -50%);
-  }
-
-  .resize-button {
-    bottom: 10%;
-    left: 10%;
-    top: auto;
-    transform: translate(-50%, 50%);
-  }
-
-  .delete-button {
-    bottom: 10%;
-    right: 10%;
-    top: auto;
-    transform: translate(50%, 50%);
-  }
-  
-  .move-button svg, 
-  .resize-button svg {
-    width: 38px;
-    height: 38px;
-  }
-  
-  .delete-button svg {
-    width: 30px;
-    height: 30px;
+    background: var(--bg);
   }
 }
