@@ -1,12 +1,12 @@
+// static/js/app.js
 const initApp = () => {
   /* ─── Константы ───────────────────────────────────────────── */
   const MAX_CLIP_SECONDS = 60;
   const MIN_SCALE        = 1;
   const MAX_SCALE        = 4;
   const SCALE_SENSITIVITY = 0.005;
-  // Новые константы для улучшенного слайдера
-  const SLIDER_ZOOM_WINDOW_SECONDS = 120; // Окно "зума" для слайдера = 2 минуты
-  const TOOLTIP_MERGE_DISTANCE = 35; // Пикс. дистанция для слияния подсказок
+  const SLIDER_ZOOM_WINDOW_SECONDS = 120;
+  const TOOLTIP_MERGE_DISTANCE = 35;
 
   /* ─── DOM-элементы ────────────────────────────────────────── */
   const fileInput        = document.getElementById('fileInput');
@@ -30,7 +30,7 @@ const initApp = () => {
   }
 
   const durationSliderEl   = document.getElementById('durationSlider');
-  const combinedTooltip    = document.getElementById('combinedTooltip'); // Наша новая подсказка
+  const combinedTooltip    = document.getElementById('combinedTooltip');
   const durationValueLabel = document.getElementById('durationValueLabel');
   const sizeSlider         = document.getElementById('sizeSlider');
   const sizeOut            = document.getElementById('sizeOut');
@@ -103,10 +103,6 @@ const initApp = () => {
     currentTimeSpan.textContent = '00:00';
   };
 
-  /**
-   * Логика для "умных" подсказок слайдера.
-   * Скрывает стандартные и показывает одну объединенную, если ручки слишком близко.
-   */
   const updateCombinedTooltip = (values, handle, unencoded, tap, positions) => {
     const handles = durationSlider.target.querySelectorAll('.noUi-handle');
     const tooltips = durationSlider.target.querySelectorAll('.noUi-tooltip');
@@ -136,8 +132,6 @@ const initApp = () => {
   const initDurationSlider = (videoDuration) => {
     const start = 0;
     const end = Math.min(videoDuration, MAX_CLIP_SECONDS);
-
-    // Начальный диапазон для слайдера - это наше "окно зума" или меньше, если видео короткое
     const initialRangeMax = Math.min(videoDuration, SLIDER_ZOOM_WINDOW_SECONDS);
 
     if (durationSlider) durationSlider.destroy();
@@ -156,8 +150,7 @@ const initApp = () => {
       durationValueLabel.textContent = `${clipDur.toFixed(1)} сек`;
       updateCombinedTooltip(values, handle, unencoded, tap, positions);
     });
-
-    // Принудительно вызываем обновление, чтобы подсказки сразу отобразились корректно
+    
     durationSlider.set(durationSlider.get());
   };
 
@@ -209,7 +202,8 @@ const initApp = () => {
     videoPreview.pause();
     moveScrub(event);
     document.addEventListener('mousemove', moveScrub);
-    document.addEventListener('touchmove', moveScrub);
+    // ИЗМЕНЕНИЕ ЗДЕСЬ: Добавлен объект опций { passive: false }
+    document.addEventListener('touchmove', moveScrub, { passive: false });
     document.addEventListener('mouseup', endScrub);
     document.addEventListener('touchend', endScrub);
     document.addEventListener('mouseleave', endScrub);
@@ -231,33 +225,27 @@ const initApp = () => {
     const progress = angle / 330;
     const newTime = progress * videoPreview.duration;
 
-    // Обновляем всё: превью, круговой хэндл и время
     videoPreview.currentTime = newTime;
     updateScrubberHandle(newTime, videoPreview.duration);
     updateCurrentTime();
 
-    // ГЛАВНОЕ ИЗМЕНЕНИЕ: Перенастраиваем noUiSlider
     if (durationSlider && videoPreview.duration > SLIDER_ZOOM_WINDOW_SECONDS) {
       const halfWindow = SLIDER_ZOOM_WINDOW_SECONDS / 2;
       let newRangeMin = Math.max(0, newTime - halfWindow);
       let newRangeMax = newRangeMin + SLIDER_ZOOM_WINDOW_SECONDS;
 
-      // Корректировка, если вышли за пределы видео
       if (newRangeMax > videoPreview.duration) {
         newRangeMax = videoPreview.duration;
         newRangeMin = newRangeMax - SLIDER_ZOOM_WINDOW_SECONDS;
       }
       
-      // Получаем текущую длину клипа, чтобы сохранить ее
       const currentSelection = durationSlider.get();
       const clipLength = currentSelection[1] - currentSelection[0];
       
-      // Обновляем диапазон слайдера
       durationSlider.updateOptions({
         range: { min: newRangeMin, max: newRangeMax }
-      }, false); // false = не вызывать 'update' событие
+      }, false);
 
-      // Восстанавливаем ручки в новом диапазоне, сохраняя их длину
       const newStart = clamp(newTime, newRangeMin, newRangeMax - clipLength);
       durationSlider.set([newStart, newStart + clipLength]);
     }
