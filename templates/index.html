@@ -30,7 +30,6 @@
     <div class="player-wrapper hidden" id="playerWrapper">
       <div class="video-area">
         <div class="video-container">
-          <!-- АТРИБУТ "muted" УДАЛЕН -->
           <video id="videoPreview" playsinline loop></video>
           <div class="video-overlay" id="videoOverlay">
             <svg class="play-icon" viewBox="0 0 100 100">
@@ -48,14 +47,13 @@
               d="M9,3V4H4V6H5V19C5,20.1 5.9,21 7,21H17C18.1,21 19,20.1 19,19V6H20V4H15V3H9M7,6H17V19H7V6M9,8V17H11V8H9M13,8V17H15V8H13Z" />
           </svg>
         </button>
-        <!-- ID КНОПКИ ИЗМЕНЕН -->
         <button class="resize-button" id="resizeButton" aria-label="Изменить размер кадра">
           <svg viewBox="0 0 24 24">
             <path
               d="M11,3 A8,8 0 1,1 3,11 A8,8 0 0,1 11,3 M11,5 A6,6 0 1,0 17,11 A6,6 0 0,0 11,5 M16.5,15.1 L19.5,18.1 L18.1,19.5 L15.1,16.5 Z" />
           </svg>
         </button>
-        <button class="move-button" id="deleteMove" aria-label="Сместить центр видео">
+        <button class="move-button" id="moveButton" aria-label="Сместить центр видео">
           <svg viewBox="0 0 24 24">
             <path d="M12 2 L15 5 L13 5 L13 11 L11 11 L11 5 L9 5 Z  M12 22 L9 19 L11 19 L11 13 L13 13 L13 19 L15 19 Z  M2 12 L5 9 L5 11 L11 11 L11 13 L5 13 L5 15 Z  M22 12 L19 15 L19 13 L13 13 L13 11 L19 11 L19 9 Z"/>
           </svg>
@@ -73,6 +71,8 @@
             <span id="durationValueLabel">60.0 сек</span>
           </div>
           <div id="durationSlider"></div>
+          <!-- ДОБАВЛЕН НОВЫЙ ЭЛЕМЕНТ ДЛЯ ОБЪЕДИНЕННОЙ ПОДСКАЗКИ -->
+          <div id="combinedTooltip" class="combined-tooltip hidden"></div>
         </div>
         <div class="control-group resolution-group">
           <div class="label-container">
