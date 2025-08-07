@@ -5,7 +5,6 @@
   --sh-dark: #121317;
   --sh-light: #2a2b31;
   --accent: #ff7060;
-  /* Оранжево-красный акцент */
   --accent-glow: #ff706080;
   --font-color: #d0d1d6;
   --font-color-muted: #6a6d78;
@@ -51,7 +50,8 @@ h1 {
 }
 
 /* --- Начальный экран --- */
-#uploadScreen {
+#uploadScreen,
+.video-area {
   width: 100%;
   max-width: 380px;
   margin: 0 auto;
@@ -67,7 +67,7 @@ h1 {
   justify-content: center;
   align-items: center;
   cursor: pointer;
-  box-shadow: inset 8px 8px 16px var(--sh-dark), inset -8px -8px 16px var(--sh-light);
+  box-shadow: inset 3px 3px 4px var(--sh-dark), inset -3px -3px 4px var(--sh-light);
   transition: all 0.15s linear;
 }
 
@@ -97,13 +97,6 @@ h1 {
 #playerScreen {
   display: flex;
   flex-direction: column;
-}
-
-.video-area {
-  position: relative;
-  width: 100%;
-  max-width: 380px;
-  margin: 0 auto;
 }
 
 .video-container {
@@ -142,6 +135,7 @@ h1 {
   pointer-events: none;
   transition: opacity 0.2s ease;
   background: rgba(0, 0, 0, 0.2);
+  z-index: 2;
 }
 
 .play-icon {
@@ -150,7 +144,7 @@ h1 {
   height: 30%;
 }
 
-/* --- Круговой скраббер (финальная версия) --- */
+/* --- Круговой скраббер --- */
 .scrubber-svg {
   position: absolute;
   top: 0;
@@ -159,15 +153,13 @@ h1 {
   height: 100%;
   pointer-events: none;
   overflow: visible;
-  /* Чтобы тень от дотика не обрезалась */
+  z-index: 5;
 }
 
 .scrubber-track-bg,
 .scrubber-track-fg {
   fill: none;
   stroke-linecap: round;
-  /* Скругляем концы дуги */
-  stroke-width: 8;
 }
 
 .scrubber-track-bg {
@@ -183,8 +175,7 @@ h1 {
 .scrubber-handle {
   fill: var(--accent);
   stroke: var(--surface);
-  stroke-width: 4;
-  r: 10;
+  /* r: 10; <-- ЭТА СТРОКА УДАЛЕНА. Теперь радиус контролируется JS */
   filter: drop-shadow(0 2px 4px var(--sh-dark));
   pointer-events: all;
   cursor: pointer;
@@ -314,6 +305,12 @@ input[type=text] {
   border: none;
   box-shadow: inset 3px 3px 6px var(--sh-dark), inset -3px -3px 6px var(--sh-light);
   height: 8px;
+  padding: 0 11px;
+  box-sizing: border-box;
+}
+
+.noUi-connects {
+  margin: 0 -11px;
 }
 
 .noUi-connect {
@@ -403,5 +400,10 @@ input[type=range]::-webkit-slider-thumb {
     border-radius: 0;
     box-shadow: none;
     background: var(--bg);
+  }
+
+  #uploadScreen,
+  .video-area {
+    max-width: none;
   }
 }

@@ -7,6 +7,7 @@ const initApp = () => {
   const SCALE_SENSITIVITY = 0.005;
   const SLIDER_ZOOM_WINDOW_SECONDS = 120;
   const TOOLTIP_MERGE_DISTANCE = 50;
+  const SCRUBBER_RADIUS = 90; // Радиус нашего кругового скраббера из SVG path
 
   /* ─── DOM-элементы ────────────────────────────────────────── */
   const uploadScreen = document.getElementById('uploadScreen');
@@ -57,6 +58,30 @@ const initApp = () => {
 
   const applyTransform = () => {
     videoPreview.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  };
+
+  // НОВАЯ ФУНКЦИЯ для фиксации размеров дотика и дуги
+  const updateScrubberAppearance = () => {
+    if (!scrubberProgress) return;
+    const svg = scrubberProgress.ownerSVGElement;
+    const bgTrack = svg.querySelector('.scrubber-track-bg');
+    const currentWidth = svg.getBoundingClientRect().width;
+    const viewBoxWidth = svg.viewBox.baseVal.width;
+
+    if (currentWidth === 0 || viewBoxWidth === 0) return;
+
+    const scaleFactor = currentWidth / viewBoxWidth;
+
+    // Целевые размеры в пикселях (соответствуют другим слайдерам)
+    const targetStrokeWidth = 8;
+    const targetHandleRadius = 11; // Диаметр 22px
+
+    const newStrokeWidth = targetStrokeWidth / scaleFactor;
+    const newHandleRadius = targetHandleRadius / scaleFactor;
+
+    scrubberProgress.style.strokeWidth = newStrokeWidth;
+    bgTrack.style.strokeWidth = newStrokeWidth;
+    scrubberHandle.setAttribute('r', newHandleRadius);
   };
 
   const updateScrubberHandle = (time, duration) => {
@@ -182,11 +207,11 @@ const initApp = () => {
     convertButton.disabled = false;
     applyTransform();
     updateScrubberHandle(0, videoPreview.duration);
+    updateScrubberAppearance(); // ИЗМЕНЕНИЕ: Вызываем функцию для фиксации размеров
   });
 
   videoPreview.addEventListener('timeupdate', () => {
     const time = videoPreview.currentTime;
-    // Обновляем текст и дугу только если НЕ перетаскиваем, чтобы избежать конфликтов
     if (!isScrubbing) {
       currentTime.textContent = formatTime(time);
       updateScrubberHandle(time, videoPreview.duration);
@@ -201,7 +226,7 @@ const initApp = () => {
 
   deleteButton.addEventListener('click', showUploader);
 
-  /* ─── ЛОГИКА КРУГОВОГО СКРАББЕРА (ФИНАЛЬНАЯ) --- */
+  /* ─── ЛОГИКА КРУГОВОГО СКРАББЕРА --- */
   const startScrub = (event) => {
     isScrubbing = true;
     videoPreview.pause();
@@ -228,7 +253,6 @@ const initApp = () => {
       const progress = angle / 330;
       const newTime = progress * videoPreview.duration;
 
-      // ИЗМЕНЕНИЯ ЗДЕСЬ: Обновляем всё в реальном времени
       videoPreview.currentTime = newTime;
       updateScrubberHandle(newTime, videoPreview.duration);
       currentTime.textContent = formatTime(newTime);
@@ -321,6 +345,9 @@ const initApp = () => {
   sizeSlider.addEventListener('input', () => {
     sizeOut.textContent = sizeSlider.value;
   });
+
+  // ИЗМЕНЕНИЕ: Добавляем слушатель на ресайз окна
+  window.addEventListener('resize', updateScrubberAppearance);
 
   showUploader();
 };
