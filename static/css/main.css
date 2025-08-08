@@ -212,7 +212,7 @@ h1 {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: linear-gradient(145deg, #292c34, #1c1d22); /* неоморфный градиент */
+  background: linear-gradient(145deg, #46436a, #1c1d22); /* неоморфный градиент */
   border: 2px solid #1e1f26; /* тонкая тёмная обводка */
   display: flex;
   align-items: center;
@@ -351,6 +351,10 @@ input[type=text] {
 .noUi-connect {
   background: var(--gradient-main);
 }
+
+/* .noUi-connect .noUi-draggable {
+  transform: translate(0%, 2px) scale(0.5, 0.5);
+} */
 
 .noUi-handle {
   border-radius: 50%;
