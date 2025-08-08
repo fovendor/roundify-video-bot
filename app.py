@@ -7,8 +7,8 @@ import json
 import logging
 import os
 import pathlib as pl
+import sys
 import tempfile
-import time
 import uuid
 from typing import Any, Dict
 
@@ -17,14 +17,13 @@ import httpx
 from fastapi import (
     FastAPI,
     File,
-    Form,
     HTTPException,
     Request,
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
 )
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -32,7 +31,9 @@ from fastapi.templating import Jinja2Templates
 WORKERS = int(os.getenv("ROUNDIPY_JOBS", 2))
 ffmpeg_semaphore = asyncio.Semaphore(WORKERS)
 
-TTL_SECONDS = int(os.getenv("TTL_SECONDS", 60))
+# Токен теперь читается из переменных окружения
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
 MAX_CLIP_SECONDS = int(os.getenv("MAX_CLIP_SECONDS", 60))
 MAX_UPLOAD_BYTES = 600 * 1024 * 1024  # 600 MB
 
@@ -86,8 +87,13 @@ def calc_video_bitrate(max_mb: int, clip_sec: float, audio_kbps: int = 128) -> i
     total_kbps = int(max_mb * 8192 / clip_sec)
     return max(200, total_kbps - audio_kbps)
 
-async def send_to_telegram(path: pl.Path, token: str, chat: str) -> bool:
-    url = f"https://api.telegram.org/bot{token}/sendVideoNote"
+async def send_to_telegram(path: pl.Path, chat: str) -> bool:
+    # Функция теперь использует глобальный токен
+    if not TELEGRAM_BOT_TOKEN:
+        log.error("Telegram token is not configured. Cannot send video note.")
+        return False
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideoNote"
     try:
         async with aiofiles.open(path, "rb") as f:
             content = await f.read()
@@ -114,14 +120,14 @@ async def run_ffmpeg_and_notify(
 ):
     dst_path = TMP / dst_filename
 
-    # очередь
-    if ffmpeg_semaphore.locked():
-        waiters = getattr(ffmpeg_semaphore, "_waiters", None)
-        position = len(waiters) + 1 if waiters else 1
-        await websocket.send_json({"type": "queued", "job": job_id, "position": position})
+    try:
+        # очередь
+        if ffmpeg_semaphore.locked():
+            waiters = getattr(ffmpeg_semaphore, "_waiters", None)
+            position = len(waiters) + 1 if waiters else 1
+            await websocket.send_json({"type": "queued", "job": job_id, "position": position})
 
-    async with ffmpeg_semaphore:
-        try:
+        async with ffmpeg_semaphore:
             await websocket.send_json(
                 {"type": "status_update", "job": "job_id", "status": "Processing..."}
             )
@@ -187,13 +193,13 @@ async def run_ffmpeg_and_notify(
                 log.error(f"FFmpeg failed for job {job_id}:\n{error_output}")
                 raise RuntimeError(f"FFmpeg failed. Error: {error_output.splitlines()[-1] if error_output else 'Unknown'}")
 
-
             await websocket.send_json(
                 {"type": "status_update", "job": job_id, "status": "Finalizing..."}
             )
 
             tg_ok = False
-            if opts.get("token") and opts.get("chat"):
+            # Проверяем наличие chat_id, а токен теперь глобальный
+            if opts.get("chat") and TELEGRAM_BOT_TOKEN:
                 if dst_path.exists() and dst_path.stat().st_size > 0:
                     await websocket.send_json(
                         {
@@ -202,34 +208,38 @@ async def run_ffmpeg_and_notify(
                             "status": "Sending to Telegram...",
                         }
                     )
-                    tg_ok = await send_to_telegram(dst_path, opts["token"], opts["chat"])
+                    # Передаем только chat, токен уже не нужен
+                    tg_ok = await send_to_telegram(dst_path, opts["chat"])
 
-            download_url = app.url_path_for("download", filename=dst_filename)
+            # Ссылка на скачивание больше не формируется
             await websocket.send_json(
                 {
                     "type": "done",
                     "job": job_id,
-                    "download": download_url,
+                    "download": None, # Убрали ссылку
                     "telegram": tg_ok,
-                    "ttl": TTL_SECONDS,
+                    "ttl": None, # Убрали TTL
                 }
             )
 
-        except Exception as e:
-            log.error(f"Error in background task for job {job_id}: {e}", exc_info=True)
-            try:
-                await websocket.send_json(
-                    {
-                        "type": "error",
-                        "job": job_id,
-                        "message": f"Unexpected error: {e}",
-                    }
-                )
-            except WebSocketDisconnect:
-                pass
-        finally:
-            if src_path.exists():
-                os.unlink(src_path)
+    except Exception as e:
+        log.error(f"Error in background task for job {job_id}: {e}", exc_info=True)
+        try:
+            await websocket.send_json(
+                {
+                    "type": "error",
+                    "job": job_id,
+                    "message": f"Unexpected error: {e}",
+                }
+            )
+        except WebSocketDisconnect:
+            pass
+    finally:
+        # Гарантированная очистка всех временных файлов
+        if src_path.exists():
+            os.unlink(src_path)
+        if dst_path.exists():
+            os.unlink(dst_path)
 
 # ───────────── routes ─────────────
 @app.get("/", response_class=HTMLResponse)
@@ -240,13 +250,11 @@ async def index(request: Request):
 
 @app.post("/api/upload")
 async def api_upload(request: Request, video: UploadFile = File(...)):
-    # --- новая проверка на размер -----------
     cl = request.headers.get("content-length")
     if cl and int(cl) > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413, detail=f"File too large. Limit is {MAX_UPLOAD_BYTES // 1048576} MB."
         )
-    # ----------------------------------------
 
     if not video or not video.filename:
         raise HTTPException(status_code=400, detail="file field missing")
@@ -305,7 +313,8 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
             )
             return
 
-        is_for_telegram = bool(opts.get("token") and opts.get("chat"))
+        # Отправка в телеграм определяется наличием chat_id и глобального токена
+        is_for_telegram = bool(opts.get("chat") and TELEGRAM_BOT_TOKEN)
         opts["max_mb"] = 8 if is_for_telegram else 100
         dst_filename = f"{tmp_in.stem}_round.mp4"
 
@@ -327,31 +336,36 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
     except Exception as e:
         log.error(f"WebSocket Error for job {job_id}: {e}")
 
-@app.get("/download/{filename:path}", response_class=FileResponse)
-async def download(filename: str):
-    path = TMP / filename
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="File not found or expired.")
-    return FileResponse(path, media_type="video/mp4", filename=filename)
+# Эндпоинт для скачивания удален
+# @app.get("/download/{filename:path}", response_class=FileResponse) ...
 
 @app.get("/ping")
 async def ping():
     return "pong"
 
-async def janitor():
-    log.info("Janitor starting...")
-    while True:
-        try:
-            now = time.time()
-            # Удаляем только обработанные файлы, а не исходные in_*.mp4
-            for p in TMP.glob("*_round.mp4"):
-                if p.is_file() and p.stat().st_mtime < now - TTL_SECONDS:
-                    log.info(f"Janitor removing expired file: {p.name}")
-                    p.unlink(missing_ok=True)
-        except Exception as e:
-            log.error(f"Janitor error: {e}")
-        await asyncio.sleep(max(TTL_SECONDS, 60))
+# Функция-уборщик удалена
+# async def janitor(): ...
+
+def check_telegram_token():
+    """Проверяет токен Telegram при старте приложения."""
+    if not TELEGRAM_BOT_TOKEN:
+        log.error("CRITICAL: TELEGRAM_BOT_TOKEN environment variable not set. Application will not start.")
+        sys.exit(1)
+    
+    log.info("Validating Telegram token...")
+    try:
+        r = httpx.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe", timeout=10)
+        if r.status_code == 200:
+            bot_info = r.json().get("result", {})
+            log.info(f"Telegram token is valid for bot: @{bot_info.get('username')}")
+        else:
+            log.error(f"CRITICAL: Telegram token is invalid. API response: {r.status_code} - {r.text}. Application will not start.")
+            sys.exit(1)
+    except httpx.RequestError as e:
+        log.error(f"CRITICAL: Could not connect to Telegram API to validate token: {e}. Application will not start.")
+        sys.exit(1)
 
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(janitor())
+    # При старте теперь проверяется токен
+    check_telegram_token()

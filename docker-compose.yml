@@ -8,10 +8,10 @@ services:
     environment:
       # Number of concurrent FFmpeg processes
       ROUNDIPY_JOBS: 2
-      # Lifetime of the finished file in seconds
-      TTL_SECONDS: 60
       # Maximum clip duration (Telegram's limit)
       MAX_CLIP_SECONDS: 60
+      # Telegram Bot Token (get it from @BotFather)
+      TELEGRAM_BOT_TOKEN: "your_token_here"
 
     volumes:
       - ./static:/app/static

@@ -7,21 +7,34 @@
 ## Key Features
 
 - 💿 **Perfect Crop:** Video is automatically cropped to a square and scaled to the desired resolution (240-1024px).
-- 📊 **Integrated Progress Bar:** Track the conversion process in real-time with a satisfying text "fill" effect.
+- 🖼️ **Interactive Framing:** Zoom and pan the video to select the perfect frame for your video note.
+- 📊 **Integrated Progress Bar:** Track the conversion process in real-time.
 - ⏱️ **Flexible Settings:** Easily adjust the duration and start offset for the clip you want to create.
-- 🤖 **Telegram Integration:** Provide a bot token and chat ID, and the finished video note will be sent directly to Telegram.
-- 🗑️ **Auto-Cleanup:** Every generated file lives on the server for `TTL_SECONDS` (default is 60), after which it is automatically deleted.
+- 🤖 **Telegram Integration:** Provide a chat ID, and the finished video note will be sent directly to Telegram using the server-configured bot.
+- 🗑️ **Stateless & Secure:** No files are stored on the server. Videos are processed in memory and immediately deleted after being sent.
 - ⚙️ **Parallel Tasks:** The service can process multiple videos simultaneously (the number of workers is configurable).
 
 ## Architecture
 
-The video processing flow is split into several stages for a better, more responsive UI.
+The service's architecture consists of two main phases: server startup and request lifecycle.
+
+**1. Server Startup and Validation**
+
+Before the server starts accepting requests, it performs a critical self-check:
+*   It reads the `TELEGRAM_BOT_TOKEN` from the environment variables.
+*   It sends a `getMe` request to the Telegram API to validate the token.
+*   If the token is invalid or the API is unreachable, the server logs a critical error and immediately shuts down. This ensures the service never runs in a misconfigured state.
+
+**2. User Request Lifecycle**
+
+Once the server is running, it processes user requests according to the following sequence:
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant Server as Server (FastAPI)
     participant FFmpeg as FFmpeg Task (Background)
+    participant Telegram as Telegram API
 
     Client->>+Server: (1) POST /api/upload (file)
     Server->>-Client: (2) Response: {job_id, meta}
@@ -34,26 +47,12 @@ sequenceDiagram
         Server-->>Client: (7) WS Message: {type: "progress", ...}
     end
     FFmpeg-->>-Server: (8) Conversion complete
-    Server-->>Client: (9) WS Message: {type: "done", ...}
+    Server->>+Telegram: (9) POST /sendVideoNote with video
+    Telegram-->>-Server: (10) Response (OK/Error)
+    Server-->>Client: (11) WS Message: {type: "done", telegram: true/false}
 ```
 
 ## Deployment
-
-### Quick Start (Local)
-
-```bash
-# Install dependencies
-sudo apt-get install ffmpeg python3-venv
-
-# Clone and run
-git clone https://github.com/yourname/roundipy-video-bot.git
-cd roundipy-video-bot
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 8000
-
-# Open http://localhost:8000 in your browser
-```
 
 ### Docker Compose Deployment (Recommended)
 
@@ -61,9 +60,9 @@ This is the easiest and most reliable way to run the service in production.
 
 **1. `docker-compose.yml`**
 
-Create this file in the project root. This example includes advanced network settings to assign a static IP to the container, which can be useful in complex setups.
+Create this file in the project root. You **must** specify your Telegram Bot Token.
 
-```yml
+```yaml
 services:
   roundipy:
     build: .
@@ -72,16 +71,16 @@ services:
     restart: unless-stopped
     environment:
       # Number of concurrent FFmpeg processes
-      ROUNDIFY_JOBS: 2
-      # Lifetime of the finished file in seconds
-      TTL_SECONDS: 60
+      ROUNDIPY_JOBS: 2
       # Maximum clip duration (Telegram's limit)
       MAX_CLIP_SECONDS: 60
+      # Telegram Bot Token (get it from @BotFather)
+      TELEGRAM_BOT_TOKEN: "your_token_here"
     ports:
       # The service will only be available locally on port 8000
       - "127.0.0.1:8000:8000"
     volumes:
-      - ./static:/static
+      - ./static:/app/static
     # -------------------------
     networks:
       roundipy_net:
@@ -111,79 +110,22 @@ docker compose up -d
 docker compose logs -f roundipy
 ```
 
-**4. Upgrade**
-
-```bash
-# Get the latest code
-git pull
-
-# Rebuild the image, pulling in the changes
-docker compose build --pull
-
-# Restart the container with the new version
-docker compose up -d
-```
-
-### Nginx Reverse Proxy Setup
-
-To make your service available on the internet with a domain name and SSL certificate.
-
-Example configuration for `/etc/nginx/sites-available/roundipy`:
-
-```nginx
-server {
-    server_name roundipy.example.com;
-    client_max_body_size 600M;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade $http_upgrade;
-        proxy_set_header   Connection "upgrade";
-
-        proxy_buffering off;
-        proxy_read_timeout 300s;
-        proxy_connect_timeout 300s;
-    }
-
-    listen 443 ssl;                                   # managed by Certbot
-    ssl_certificate     /etc/letsencrypt/live/roundipy.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/roundipy.example.com/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-}
-
-server {
-    if ($host = roundipy.example.com) {
-        return 301 https://$host$request_uri;
-    }
-    listen 80;
-    server_name roundipy.example.com;
-    return 404;                                       # managed by Certbot
-}
-```
-
 ## API and Request Lifecycle
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | / | Serves the main page. |
-| POST | /api/upload | **Step 1:** Accepts a video, saves it, returns metadata (duration, resolution) and a `job_id`. |
-| WS | /ws/{job_id} | **Step 2:** Establishes a WebSocket connection. The client sends a `start_conversion` message with options to begin the conversion. The server sends real-time events: `queued`, `progress`, `done`, `error`. |
-| GET | /download/{filename} | Allows downloading the finished file before its TTL expires. |
+| GET | /   | Serves the main page. |
+| POST | /api/upload | **Step 1:** Accepts a video, saves it temporarily, returns metadata (duration, resolution) and a `job_id`. |
+| WS  | /ws/{job_id} | **Step 2:** Establishes a WebSocket connection. The client sends a `start_conversion` message with options (crop, scale, timing, chat_id) to begin. The server sends real-time events: `queued`, `progress`, `done`, `error`. |
 | GET | /ping | Health check, responds with `pong`. |
 
 ## Environment Variables
 
 | Name | Default | Purpose |
 | --- | --- | --- |
-| `ROUNDIPY_JOBS` | 2 | Number of concurrent conversion jobs. |
-| `TTL_SECONDS` | 60 | Lifetime of the finished file and its download link. |
-| `MAX_CLIP_SECONDS` | 60 | Maximum duration of the final clip (Telegram's limit). |
+| `ROUNDIPY_JOBS` | 2   | Number of concurrent conversion jobs. |
+| `MAX_CLIP_SECONDS` | 60  | Maximum duration of the final clip (Telegram's limit). |
+| `TELEGRAM_BOT_TOKEN` | **None** | **Required.** Your Telegram bot token. The service will not start without it. |
 
 ## License
 
