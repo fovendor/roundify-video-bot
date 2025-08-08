@@ -1,11 +1,17 @@
 :root {
+  --bg-gradient: linear-gradient(0deg,#1D1E21 0%, #202328 150%);
   --bg: #1e1f26;
   --surface: #2a2d35;
   --surface-inset: #16171c;
+  --surface-gradient: linear-gradient(0deg,#3C3F44 0%, #0B0E13 150%);
   --sh-dark: #121317;
   --sh-light: #2a2b31;
-  --accent: #ff7060;
-  --accent-glow: #ff706080;
+  --accent: #ff00cc;
+  --accent-muted: #85567b;
+  --accent-glow: #ff00cc80;
+  --accent-shadow-dark: #4d1060;
+  --accent-shadow-light: #5e1ab0;
+  --gradient-main: linear-gradient(135deg, #ff00cc, #3333ff);
   --font-color: #d0d1d6;
   --font-color-muted: #6a6d78;
   --radius-l: 1.5rem;
@@ -20,11 +26,12 @@
 html,
 body {
   height: 100%;
+  user-select: none;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--bg-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -33,19 +40,27 @@ body {
   overflow-y: auto;
 }
 
+.card-wrapper {
+  background: linear-gradient(135deg, #ff00cc, #3333ff); /* градиент рамки */
+  padding: 4px; /* толщина рамки */
+  border-radius: var(--radius-l);
+  width: fit-content;
+  margin: auto;
+  box-shadow: 10px 10px 20px var(--sh-dark), -10px -10px 20px var(--sh-light);
+}
+
 .card {
-  background: var(--surface);
-  padding: 2rem;
+  background: var(--surface-gradient); /* тёмный фон внутри */
   border-radius: var(--radius-l);
   width: clamp(320px, 90vw, 420px);
-  box-shadow: 10px 10px 20px var(--sh-dark), -10px -10px 20px var(--sh-light);
+  padding: 2rem;
 }
 
 h1 {
   margin: 0 0 2rem;
   text-align: center;
   font-size: 2rem;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--font-color);
 }
 
@@ -85,7 +100,7 @@ h1 {
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 2.5rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--font-color-muted);
   text-align: center;
   line-height: 1.2;
@@ -126,22 +141,22 @@ h1 {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 80%;
-  height: 80%;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
   transition: opacity 0.2s ease;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.6);
   z-index: 2;
 }
 
 .play-icon {
   fill: rgba(255, 255, 255, 0.7);
-  width: 30%;
-  height: 30%;
+  width: 70%;
+  height: 70%;
 }
 
 /* --- Круговой скраббер --- */
@@ -197,13 +212,16 @@ h1 {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: var(--surface);
-  border: none;
+  background: linear-gradient(145deg, #292c34, #1c1d22); /* неоморфный градиент */
+  border: 2px solid #1e1f26; /* тонкая тёмная обводка */
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 5px 5px 10px var(--sh-dark), -5px -5px 10px var(--sh-light);
-  transition: all 0.15s ease-out;
+  box-shadow:
+    5px 5px 10px rgba(0, 0, 0, 0.5),
+    -5px -5px 10px rgba(255, 255, 255, 0.03),
+    inset 0 0 0 0 transparent; /* будет меняться при active */
+  transition: all 0.2s ease-out;
 }
 
 .tool-button {
@@ -211,8 +229,10 @@ h1 {
 }
 
 .tool-button:active {
-  box-shadow: inset 5px 5px 10px var(--sh-dark), inset -5px -5px 10px var(--sh-light);
-  transform: scale(0.95);
+  box-shadow:
+    inset 5px 5px 10px rgba(0, 0, 0, 0.6),
+    inset -5px -5px 10px rgba(255, 255, 255, 0.02);
+  transform: scale(0.97);
 }
 
 .tool-button svg {
@@ -222,6 +242,10 @@ h1 {
   transition: fill 0.15s;
 }
 
+.tool-button:hover {
+  filter: brightness(1.05);
+}
+
 .tool-button:hover svg {
   fill: var(--font-color);
 }
@@ -229,7 +253,7 @@ h1 {
 .time-display {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--font-color-muted);
+  color: var(--font-color);
 }
 
 /* --- Элементы управления --- */
@@ -264,36 +288,47 @@ input[type=text] {
   color: var(--font-color);
   margin-top: 1.5rem;
   background: var(--surface);
-  box-shadow: inset 5px 5px 10px var(--sh-dark), inset -5px -5px 10px var(--sh-light);
+  box-shadow: inset 1px 1px 2px var(--sh-dark), inset -1px -1px 2px var(--sh-light);
+}
+
+#token,
+#chat {
+  user-select: text;
 }
 
 #convertButton {
   width: 100%;
   padding: 1rem;
-  border: none;
+  border: 2px solid var(--accent-muted); /* тонкая тёмная обводка */
   border-radius: var(--radius-m);
   font-size: 1.2rem;
   margin-top: 2rem;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 5px 5px 10px #4e1e1a, -5px -5px 10px #6a2a24;
-  transition: all 0.15s ease-out;
+  background: linear-gradient(145deg, #292c34, #1c1d22);
+  color: var(--font-color);
+  box-shadow:
+    12px 12px 20px #00000080,
+    -5px -2px 3px #ffffff05,
+    1px 1px 3px var(--accent);
+  transition: all 0.05s ease-out;
 }
 
 #convertButton:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.25);
 }
 
 #convertButton:active {
-  transform: scale(0.98);
-  box-shadow: inset 5px 5px 10px #4e1e1a, inset -5px -5px 10px #6a2a24;
+  transform: scale(0.99);
+  box-shadow:
+    inset 5px 5px 10px rgba(0, 0, 0, 0.5),
+    inset -5px -5px 10px rgba(255, 255, 255, 0.02);
 }
 
 #convertButton:disabled {
-  background: var(--font-color-muted);
-  color: var(--surface);
+  background: var(--surface);
+  color: var(--font-color-muted);
+  border-color: var(--font-color-muted);
   box-shadow: none;
   cursor: not-allowed;
 }
@@ -314,7 +349,7 @@ input[type=text] {
 }
 
 .noUi-connect {
-  background: var(--accent);
+  background: var(--gradient-main);
 }
 
 .noUi-handle {
@@ -343,7 +378,7 @@ input[type=text] {
 
 .combined-tooltip {
   position: absolute;
-  bottom: 1.5rem;
+  bottom: -1.6rem;
   background: var(--surface);
   color: var(--font-color);
   font-weight: 600;
@@ -393,13 +428,18 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 @media(max-width:600px) {
-  .card {
+  .card-wrapper {
     width: 100vw;
-    min-height: 100dvh;
-    padding: 1.5rem 1.2rem calc(2rem + env(safe-area-inset-bottom));
+    height: 100dvh;
     border-radius: 0;
-    box-shadow: none;
-    background: var(--bg);
+    padding: 4px;
+  }
+
+  .card {
+    background: var(--surface-gradient);
+    border-radius: 0;
+    width: 100%;
+    height: 100%;
   }
 
   #uploadScreen,

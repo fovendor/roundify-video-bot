@@ -15,81 +15,89 @@
 </head>
 
 <body>
-  <main class="card">
-    <div id="uploadScreen">
-      <h1>RoundiPy</h1>
-      <div id="touchMeContainer">
-        <label class="touch-me-label" for="fileInput">
-          <input id="fileInput" type="file" accept="video/*" hidden>
-          <span>Touch Me</span>
-        </label>
-      </div>
-    </div>
+  <div class="card-wrapper">
 
-    <div id="playerScreen" class="hidden">
-      <div class="video-area">
-        <div class="video-container">
-          <video id="videoPreview" playsinline loop></video>
-          <div class="video-overlay" id="videoOverlay">
-            <svg class="play-icon" viewBox="0 0 100 100">
-              <path d="M 35,25 L 75,50 L 35,75 Z" />
+    <main class="card">
+      <div id="uploadScreen">
+        <h1>RoundiPy</h1>
+        <div id="touchMeContainer">
+          <label class="touch-me-label" for="fileInput">
+            <input id="fileInput" type="file" accept="video/*" hidden>
+            <span>Touch Me</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="playerScreen" class="hidden">
+        <div class="video-area">
+          <div class="video-container">
+            <video id="videoPreview" playsinline loop></video>
+            <div class="video-overlay" id="videoOverlay">
+              <svg class="play-icon" viewBox="0 0 100 100">
+                <path d="m 37.543995,26.589997 34.91201,21.820006 a 1.875,1.875 90 0 1 0,3.179994 L 37.543995,73.410003 A 1.6627429,1.6627429 28.997308 0 1 35,72 V 28 a 1.6627429,1.6627429 151.00269 0 1 2.543995,-1.410003 z"/>
+              </svg>
+            </div>
+            <svg class="scrubber-svg" viewBox="0 0 200 200">
+              <path class="scrubber-track-bg" d="M 123.3 13.1 A 90 90 0 1 1 76.7 13.1" />
+              <path class="scrubber-track-fg" id="scrubberProgress" d="M 123.3 13.1 A 90 90 0 1 1 76.7 13.1" />
+              <circle class="scrubber-handle" id="scrubberHandle" />
             </svg>
           </div>
-          <!-- ИЗМЕНЕНИЕ: SVG-скраббер ПЕРЕМЕЩЕН ВНУТРЬ video-container для идеального совпадения -->
-          <svg class="scrubber-svg" viewBox="0 0 200 200">
-            <path class="scrubber-track-bg" d="M 123.3 13.1 A 90 90 0 1 1 76.7 13.1" />
-            <path class="scrubber-track-fg" id="scrubberProgress" d="M 123.3 13.1 A 90 90 0 1 1 76.7 13.1" />
-            <circle class="scrubber-handle" id="scrubberHandle" />
-          </svg>
         </div>
-      </div>
 
-      <div class="tool-controls">
-        <button class="tool-button" id="moveButton" aria-label="Сместить центр видео">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 2L15 5h-2v6H9V5H7zM12 22l-3-3h2v-6h2v6h2zM2 12l3 3v-2h6v-2H5V9zM22 12l-3-3v2h-6v2h6v2z" />
-          </svg>
-        </button>
-        <button class="tool-button" id="resizeButton" aria-label="Изменить размер кадра">
-          <svg viewBox="0 0 24 24">
-            <path
-              d="M10 20H4v-6l2.79 2.79L12 11.59l2 2-5.21 5.21L10 20zm4-10l-2-2 5.21-5.21L16 4h6v6l-1.21-1.21L14 10z" />
-          </svg>
-        </button>
-        <div class="time-display" id="currentTime">00:00</div>
-        <button class="tool-button" id="deleteButton" aria-label="Удалить видео">
-          <svg viewBox="0 0 24 24">
-            <path
-              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-          </svg>
-        </button>
-      </div>
+        <div class="tool-controls">
+          <button class="tool-button" id="moveButton" aria-label="Сместить центр видео">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2 15 5h-2v6h-2V5H9l3-3z"/>
+              <path d="M12 22 9 19h2v-6h2v6h2l-3 3z"/>
+              <path d="M2 12 5 9v2h6v2H5v2l-3-3z"/>
+              <path d="M22 12 19 15v-2h-6v-2h6V9l3 3z"/>
+            </svg>
+          </button>
+          <button class="tool-button" id="resizeButton" aria-label="Изменить размер кадра">
+            <svg viewBox="0 0 24 24">
+              <g transform="translate(0 -1) scale(0.5)">
+                <path
+                  d="m 23.461276,4.7779043 c -9.388847,0 -16.999993,7.6111587 -16.999993,16.9999997 0,9.388841 7.611146,17 16.999993,17 9.388847,0 16.999993,-7.611159 16.999993,-17 0,-9.388841 -7.611146,-16.9999997 -16.999993,-16.9999997 z m -0.193359,5.7148437 c 6.133156,-3.78e-4 11.105307,4.971336 11.105468,11.104492 -1.61e-4,6.133156 -4.972312,11.10487 -11.105468,11.104492 -6.132775,-1.61e-4 -11.104332,-4.971717 -11.104493,-11.104492 1.61e-4,-6.132775 4.971718,-11.104331 11.104493,-11.104492 z m 14.493164,23.785156 c -0.9,1 -1.899414,1.900195 -2.899414,2.700195 l 6.744555,6.745951 2.800782,-2.800782 z" />
+              </g>
+            </svg>
+          </button>
+          <div class="time-display" id="currentTime">00:00</div>
+          <button class="tool-button" id="deleteButton" aria-label="Удалить видео">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </svg>
+          </button>
+        </div>
 
-      <div class="controls">
-        <div class="control-group">
-          <div class="label-container">
-            <span>Длительность</span>
-            <span id="durationValueLabel">0.0 сек</span>
+        <div class="controls">
+          <div class="control-group">
+            <div class="label-container">
+              <span>Длительность</span>
+              <span id="durationValueLabel">0.0 сек</span>
+            </div>
+            <div id="durationSlider"></div>
+            <div id="combinedTooltip" class="combined-tooltip hidden"></div>
           </div>
-          <div id="durationSlider"></div>
-          <div id="combinedTooltip" class="combined-tooltip hidden"></div>
-        </div>
-        <div class="control-group">
-          <div class="label-container">
-            <span>Разрешение</span>
-            <span><output id="sizeOut">640</output> px</span>
+          <div class="control-group">
+            <div class="label-container">
+              <span>Разрешение</span>
+              <span><output id="sizeOut">640</output> px</span>
+            </div>
+            <input type="range" id="sizeSlider" min="240" max="1024" step="16" value="640">
           </div>
-          <input type="range" id="sizeSlider" min="240" max="1024" step="16" value="640">
+          <input type="text" id="token" placeholder="bot token">
+          <input type="text" id="chat" placeholder="@канал или id чата">
+          <button id="convertButton" disabled>
+            <span class="convert-btn-label">ОТПРАВИТЬ</span>
+            <span class="btn-loader hidden"></span>
+          </button>
         </div>
-        <input type="text" id="token" placeholder="bot token">
-        <input type="text" id="chat" placeholder="@канал или id чата">
-        <button id="convertButton" disabled>
-          <span class="convert-btn-label">ОТПРАВИТЬ</span>
-          <span class="btn-loader hidden"></span>
-        </button>
       </div>
-    </div>
-  </main>
+    </main>
+  </div>
+
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.js"></script>
   <script src="{{ url_for('static', path='js/app.js') }}"></script>
