@@ -299,12 +299,7 @@ input[type=text]:focus {
   /* Убираем стандартную обводку браузера */
   outline: none;
   /* Делаем нашу прозрачную рамку акцентной */
-  border-color: var(--accent);
-  /* Добавляем внешнее свечение, сохраняя при этом внутреннюю тень */
-  box-shadow: 
-    inset 1px 1px 2px var(--sh-dark), 
-    inset -1px -1px 2px var(--sh-light),
-    0 0 8px var(--accent-glow);
+  border-color: var(--accent-muted);
 }
 
 #token,

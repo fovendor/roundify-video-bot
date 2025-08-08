@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import logging.config  # <-- НОВЫЙ ИМПОРТ
+import logging.config
+import logging.handlers
 import os
 import pathlib as pl
 import sys
@@ -28,34 +29,48 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-# --- НОВАЯ СЕКЦИЯ: Конфигурация логирования ---
+LOGS_DIR = pl.Path("logs")
+LOGS_DIR.mkdir(exist_ok=True)
+
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "default": {
+        "console_formatter": {
             "()": "uvicorn.logging.DefaultFormatter",
             "fmt": "%(levelprefix)s %(asctime)s | %(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S",
         },
+        "file_formatter": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        },
     },
     "handlers": {
-        "default": {
-            "formatter": "default",
+        "console": {
+            "formatter": "console_formatter",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stderr",
         },
+        "file": {
+            "formatter": "file_formatter",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOGS_DIR / "roundipy.log",
+            "maxBytes": 10 * 1024 * 1024,  # 10 MB
+            "backupCount": 3,
+            "encoding": "utf8",
+        },
     },
     "loggers": {
-        "roundipy": {"handlers": ["default"], "level": "INFO"},
-        "uvicorn.error": {"level": "INFO"},
-        "uvicorn.access": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        # Наш кастомный логгер
+        "roundipy": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+        # Логгеры Uvicorn
+        "uvicorn": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+        "uvicorn.error": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+        "uvicorn.access": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
     },
 }
 
 logging.config.dictConfig(LOGGING_CONFIG)
-# --- КОНЕЦ НОВОЙ СЕКЦИИ ---
-
 
 # ───────────── settings ─────────────
 WORKERS = int(os.getenv("ROUNDIPY_JOBS", 2))
@@ -75,7 +90,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 log = logging.getLogger("roundipy")
-# Строка logging.basicConfig(...) была удалена отсюда
 
 # ───────────── helpers ─────────────
 async def ffprobe_meta(path: pl.Path) -> Dict[str, Any]:

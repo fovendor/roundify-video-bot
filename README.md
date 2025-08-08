@@ -79,6 +79,8 @@ TELEGRAM_BOT_TOKEN="your_token_here" uvicorn app:app --host 0.0.0.0 --port 8000
 # Open http://localhost:8000 in your browser
 ```
 
+**Note:** The first time you run the server, a `logs` directory will be created in your project root to store log files.
+
 ### Docker Compose Deployment (Recommended)
 
 This is the easiest and most reliable way to run the service in production.
@@ -106,6 +108,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - ./static:/app/static
+      - ./logs:/app/logs
     # -------------------------
     networks:
       roundipy_net:
@@ -131,13 +134,19 @@ docker compose up -d
 
 ## Management and Monitoring
 
-### View Logs
+### View Logs in Real-time
 
-To view logs for the service, use the command:
-`docker compose logs roundipy`
+To follow the service logs in real-time (useful for debugging), use the `-f` flag with the `docker compose logs` command. This will stream logs from both Uvicorn and the application directly to your terminal.
 
-To follow the logs in real-time (useful for debugging), use the `-f` flag:
 `docker compose logs -f roundipy`
+
+### Persistent Log Files
+
+For detailed analysis and history, the service is configured to save logs into a `logs` directory relative to its working directory.
+
+- **When run locally:** A `./logs` directory is created directly in your project folder, containing `roundipy.log`.
+- **When run with Docker Compose:** The same `./logs` directory is created on your computer. This happens because the container's log directory (`/app/logs`) is mapped to the host's `./logs` directory via the configured volume.
+- The log file will automatically rotate when it reaches 10MB.
 
 ### Security and File Auditing
 
