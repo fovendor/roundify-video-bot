@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import logging.config  # <-- НОВЫЙ ИМПОРТ
 import os
 import pathlib as pl
 import sys
@@ -27,11 +28,39 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+# --- НОВАЯ СЕКЦИЯ: Конфигурация логирования ---
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "()": "uvicorn.logging.DefaultFormatter",
+            "fmt": "%(levelprefix)s %(asctime)s | %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+    },
+    "handlers": {
+        "default": {
+            "formatter": "default",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stderr",
+        },
+    },
+    "loggers": {
+        "roundipy": {"handlers": ["default"], "level": "INFO"},
+        "uvicorn.error": {"level": "INFO"},
+        "uvicorn.access": {"handlers": ["default"], "level": "INFO", "propagate": False},
+    },
+}
+
+logging.config.dictConfig(LOGGING_CONFIG)
+# --- КОНЕЦ НОВОЙ СЕКЦИИ ---
+
+
 # ───────────── settings ─────────────
 WORKERS = int(os.getenv("ROUNDIPY_JOBS", 2))
 ffmpeg_semaphore = asyncio.Semaphore(WORKERS)
 
-# Токен теперь читается из переменных окружения
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 MAX_CLIP_SECONDS = int(os.getenv("MAX_CLIP_SECONDS", 60))
@@ -46,9 +75,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 log = logging.getLogger("roundipy")
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
-)
+# Строка logging.basicConfig(...) была удалена отсюда
 
 # ───────────── helpers ─────────────
 async def ffprobe_meta(path: pl.Path) -> Dict[str, Any]:
@@ -88,7 +115,6 @@ def calc_video_bitrate(max_mb: int, clip_sec: float, audio_kbps: int = 128) -> i
     return max(200, total_kbps - audio_kbps)
 
 async def send_to_telegram(path: pl.Path, chat: str) -> bool:
-    # Функция теперь использует глобальный токен
     if not TELEGRAM_BOT_TOKEN:
         log.error("Telegram token is not configured. Cannot send video note.")
         return False
@@ -121,7 +147,6 @@ async def run_ffmpeg_and_notify(
     dst_path = TMP / dst_filename
 
     try:
-        # очередь
         if ffmpeg_semaphore.locked():
             waiters = getattr(ffmpeg_semaphore, "_waiters", None)
             position = len(waiters) + 1 if waiters else 1
@@ -129,15 +154,32 @@ async def run_ffmpeg_and_notify(
 
         async with ffmpeg_semaphore:
             await websocket.send_json(
-                {"type": "status_update", "job": "job_id", "status": "Processing..."}
+                {"type": "status_update", "job": job_id, "status": "Processing..."}
             )
 
             if not src_path.exists():
                 raise FileNotFoundError(f"Source file for job {job_id} not found. It may have expired.")
 
+            meta_w = opts['videoWidth']
+            meta_h = opts['videoHeight']
+            scale = opts.get('scale', 1.0)
+            offset_x = opts.get('offsetX', 0.0)
+            offset_y = opts.get('offsetY', 0.0)
+            preview_w = opts.get('previewWidth', meta_w)
+            
+            crop_size = min(meta_w, meta_h) / scale
+
+            pixel_ratio = min(meta_w, meta_h) / preview_w
+            offset_x_src = offset_x * pixel_ratio
+            offset_y_src = offset_y * pixel_ratio
+
+            crop_x = (meta_w - crop_size) / 2 - offset_x_src
+            crop_y = (meta_h - crop_size) / 2 - offset_y_src
+            
             vb = calc_video_bitrate(opts["max_mb"], opts["clip_sec"])
             vf = (
-                f"crop='min(iw\\,ih)':min(iw\\,ih),setsar=1,"
+                f"crop={crop_size}:{crop_size}:{crop_x}:{crop_y},"
+                f"setsar=1,"
                 f"scale={opts['size']}:{opts['size']}"
             )
 
@@ -170,6 +212,7 @@ async def run_ffmpeg_and_notify(
                 "mp4",
                 str(dst_path),
             ]
+            log.info(f"Job {job_id} FFmpeg command: {' '.join(cmd)}")
 
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -198,7 +241,6 @@ async def run_ffmpeg_and_notify(
             )
 
             tg_ok = False
-            # Проверяем наличие chat_id, а токен теперь глобальный
             if opts.get("chat") and TELEGRAM_BOT_TOKEN:
                 if dst_path.exists() and dst_path.stat().st_size > 0:
                     await websocket.send_json(
@@ -208,17 +250,15 @@ async def run_ffmpeg_and_notify(
                             "status": "Sending to Telegram...",
                         }
                     )
-                    # Передаем только chat, токен уже не нужен
                     tg_ok = await send_to_telegram(dst_path, opts["chat"])
 
-            # Ссылка на скачивание больше не формируется
             await websocket.send_json(
                 {
                     "type": "done",
                     "job": job_id,
-                    "download": None, # Убрали ссылку
+                    "download": None,
                     "telegram": tg_ok,
-                    "ttl": None, # Убрали TTL
+                    "ttl": None,
                 }
             )
 
@@ -235,7 +275,6 @@ async def run_ffmpeg_and_notify(
         except WebSocketDisconnect:
             pass
     finally:
-        # Гарантированная очистка всех временных файлов
         if src_path.exists():
             os.unlink(src_path)
         if dst_path.exists():
@@ -313,7 +352,6 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
             )
             return
 
-        # Отправка в телеграм определяется наличием chat_id и глобального токена
         is_for_telegram = bool(opts.get("chat") and TELEGRAM_BOT_TOKEN)
         opts["max_mb"] = 8 if is_for_telegram else 100
         dst_filename = f"{tmp_in.stem}_round.mp4"
@@ -336,18 +374,11 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
     except Exception as e:
         log.error(f"WebSocket Error for job {job_id}: {e}")
 
-# Эндпоинт для скачивания удален
-# @app.get("/download/{filename:path}", response_class=FileResponse) ...
-
 @app.get("/ping")
 async def ping():
     return "pong"
 
-# Функция-уборщик удалена
-# async def janitor(): ...
-
 def check_telegram_token():
-    """Проверяет токен Telegram при старте приложения."""
     if not TELEGRAM_BOT_TOKEN:
         log.error("CRITICAL: TELEGRAM_BOT_TOKEN environment variable not set. Application will not start.")
         sys.exit(1)
@@ -367,5 +398,4 @@ def check_telegram_token():
 
 @app.on_event("startup")
 async def startup_event():
-    # При старте теперь проверяется токен
     check_telegram_token()

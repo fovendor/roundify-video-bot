@@ -23,7 +23,7 @@
         <div id="touchMeContainer">
           <label class="touch-me-label" for="fileInput">
             <input id="fileInput" type="file" accept="video/*" hidden>
-            <span>Touch Me</span>
+            <span id="touchMeText">Touch Me</span>
           </label>
         </div>
       </div>
@@ -85,12 +85,12 @@
               <span>Разрешение</span>
               <span><output id="sizeOut">640</output> px</span>
             </div>
-            <input type="range" id="sizeSlider" min="240" max="1024" step="16" value="640">
+            <input type="range" id="sizeSlider" min="240" max="640" step="16" value="400">
           </div>
           <input type="text" id="chat" placeholder="@канал или id чата">
           <button id="convertButton" disabled>
-            <span class="convert-btn-label">ОТПРАВИТЬ</span>
-            <span class="btn-loader hidden"></span>
+            <span id="convertBtnLabel" class="convert-btn-label">ОТПРАВИТЬ</span>
+            <span id="btnLoader" class="btn-loader hidden"></span>
           </button>
         </div>
       </div>

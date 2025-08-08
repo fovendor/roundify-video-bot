@@ -1,4 +1,76 @@
 // static/js/app.js
+
+const initWebSocket = (jobId, options) => {
+  const convertButton = document.getElementById('convertButton');
+  const convertBtnLabel = document.getElementById('convertBtnLabel');
+  const btnLoader = document.getElementById('btnLoader');
+
+  const wsUrl = `${location.protocol === 'https' ? 'wss' : 'ws'}://${location.host}/ws/${jobId}`;
+  const ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    console.log('WebSocket connection established.');
+    ws.send(JSON.stringify({ type: 'start_conversion', options }));
+    convertBtnLabel.textContent = 'ОБРАБОТКА...';
+    btnLoader.classList.remove('hidden');
+    convertButton.disabled = true;
+  };
+
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    console.log('Message from server:', data);
+
+    switch (data.type) {
+      case 'queued':
+        convertBtnLabel.textContent = `В ОЧЕРЕДИ (${data.position})`;
+        break;
+      case 'status_update':
+        convertBtnLabel.textContent = data.status.toUpperCase();
+        break;
+      case 'progress':
+        const clipDuration = options.clip_sec * 1000;
+        const percent = Math.round((data.ms / clipDuration) * 100);
+        convertBtnLabel.textContent = `ОБРАБОТКА... ${percent}%`;
+        break;
+      case 'done':
+        if (data.telegram) {
+          convertBtnLabel.textContent = 'УСПЕШНО ОТПРАВЛЕНО!';
+        } else {
+          convertBtnLabel.textContent = 'ГОТОВО (НЕ ОТПРАВЛЕНО)';
+        }
+        setTimeout(() => {
+          convertButton.disabled = false;
+          btnLoader.classList.add('hidden');
+          convertBtnLabel.textContent = 'ОТПРАВИТЬ';
+        }, 2000);
+        break;
+      case 'error':
+        convertBtnLabel.textContent = 'ОШИБКА!';
+        console.error('Server error:', data.message);
+        alert(`Произошла ошибка: ${data.message}`);
+        setTimeout(() => {
+          convertButton.disabled = false;
+          btnLoader.classList.add('hidden');
+          convertBtnLabel.textContent = 'ОТПРАВИТЬ';
+        }, 3000);
+        break;
+    }
+  };
+
+  ws.onerror = (error) => {
+    console.error('WebSocket Error:', error);
+    convertBtnLabel.textContent = 'ОШИБКА СОЕДИНЕНИЯ';
+    alert('Не удалось установить соединение с сервером.');
+    btnLoader.classList.add('hidden');
+    convertButton.disabled = false;
+  };
+
+  ws.onclose = () => {
+    console.log('WebSocket connection closed.');
+  };
+};
+
+
 const initApp = () => {
   /* ─── Константы ───────────────────────────────────────────── */
   const MAX_CLIP_SECONDS = 60;
@@ -7,13 +79,14 @@ const initApp = () => {
   const SCALE_SENSITIVITY = 0.005;
   const SLIDER_ZOOM_WINDOW_SECONDS = 120;
   const TOOLTIP_MERGE_DISTANCE = 50;
-  const SCRUBBER_RADIUS = 90; // Радиус нашего кругового скраббера из SVG path
+  const SCRUBBER_RADIUS = 90;
 
   /* ─── DOM-элементы ────────────────────────────────────────── */
   const uploadScreen = document.getElementById('uploadScreen');
   const playerScreen = document.getElementById('playerScreen');
 
   const fileInput = document.getElementById('fileInput');
+  const touchMeText = document.getElementById('touchMeText'); // <-- НОВЫЙ ЭЛЕМЕНТ
   const videoPreview = document.getElementById('videoPreview');
   const videoOverlay = document.getElementById('videoOverlay');
 
@@ -38,10 +111,15 @@ const initApp = () => {
   const sizeSlider = document.getElementById('sizeSlider');
   const sizeOut = document.getElementById('sizeOut');
   const convertButton = document.getElementById('convertButton');
+  const chatInput = document.getElementById('chat');
+  
+  const convertBtnLabel = document.getElementById('convertBtnLabel');
+  const btnLoader = document.getElementById('btnLoader');
 
   /* ─── Состояние ───────────────────────────────────────────── */
   let videoFile = null;
   let videoObjectURL = null;
+  let videoMetadata = {};
   let durationSlider = null;
   let isScrubbing = false, isResizing = false, isMoving = false;
   let scale = 1, offsetX = 0, offsetY = 0;
@@ -60,7 +138,6 @@ const initApp = () => {
     videoPreview.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
   };
 
-  // НОВАЯ ФУНКЦИЯ для фиксации размеров дотика и дуги
   const updateScrubberAppearance = () => {
     if (!scrubberProgress) return;
     const svg = scrubberProgress.ownerSVGElement;
@@ -72,9 +149,8 @@ const initApp = () => {
 
     const scaleFactor = currentWidth / viewBoxWidth;
 
-    // Целевые размеры в пикселях (соответствуют другим слайдерам)
     const targetStrokeWidth = 8;
-    const targetHandleRadius = 11; // Диаметр 22px
+    const targetHandleRadius = 11;
 
     const newStrokeWidth = targetStrokeWidth / scaleFactor;
     const newHandleRadius = targetHandleRadius / scaleFactor;
@@ -108,6 +184,7 @@ const initApp = () => {
     videoPreview.src = '';
     videoObjectURL = null;
     videoFile = null;
+    videoMetadata = {};
     fileInput.value = '';
     durationSlider = null;
 
@@ -116,6 +193,10 @@ const initApp = () => {
     sizeOut.textContent = sizeSlider.value;
 
     convertButton.disabled = true;
+    convertBtnLabel.textContent = 'ОТПРАВИТЬ';
+    btnLoader.classList.add('hidden');
+    touchMeText.textContent = 'Touch Me';
+
     playerScreen.classList.add('hidden');
     uploadScreen.classList.remove('hidden');
     currentTime.textContent = '00:00';
@@ -193,21 +274,60 @@ const initApp = () => {
   /* ─── Загрузка и управление видео ─────────────────────────── */
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
-    if (file && file.type.startsWith('video/')) {
-      videoFile = file;
-      videoObjectURL = URL.createObjectURL(videoFile);
-      videoPreview.src = videoObjectURL;
-      videoPreview.load();
-    }
+    if (!file || !file.type.startsWith('video/')) return;
+    videoFile = file;
+
+    const formData = new FormData();
+    formData.append('video', videoFile);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload', true);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = Math.round((event.loaded / event.total) * 100);
+        // ОБНОВЛЯЕМ ТЕКСТ В КРУГЕ "TOUCH ME"
+        touchMeText.textContent = `Загрузка ${percentComplete}%`;
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        videoMetadata = JSON.parse(xhr.responseText);
+        videoObjectURL = URL.createObjectURL(videoFile);
+        videoPreview.src = videoObjectURL;
+        videoPreview.load();
+      } else {
+        try {
+            const errorData = JSON.parse(xhr.responseText);
+            handleUploadError(errorData.detail || `HTTP error! status: ${xhr.status}`);
+        } catch {
+            handleUploadError(`HTTP error! status: ${xhr.status}`);
+        }
+      }
+    };
+
+    xhr.onerror = () => {
+      handleUploadError('Ошибка сети при загрузке файла.');
+    };
+    
+    const handleUploadError = (message) => {
+        console.error('Upload failed:', message);
+        alert(`Не удалось загрузить видео: ${message}`);
+        showUploader(); // showUploader сбросит текст на "Touch Me"
+    };
+
+    xhr.send(formData);
   });
 
+
   videoPreview.addEventListener('loadedmetadata', () => {
-    showPlayer();
+    showPlayer(); // Переключаем экран
     initDurationSlider(videoPreview.duration);
-    convertButton.disabled = false;
+    convertButton.disabled = false; // Разрешаем нажимать кнопку отправки
     applyTransform();
     updateScrubberHandle(0, videoPreview.duration);
-    updateScrubberAppearance(); // ИЗМЕНЕНИЕ: Вызываем функцию для фиксации размеров
+    updateScrubberAppearance();
   });
 
   videoPreview.addEventListener('timeupdate', () => {
@@ -292,9 +412,11 @@ const initApp = () => {
     const newScale = clamp(startScale - deltaY * SCALE_SENSITIVITY, MIN_SCALE, MAX_SCALE);
     if (newScale !== scale) {
       scale = newScale;
-      const maxOffset = (videoPreview.offsetWidth * (scale - 1)) / 2;
-      offsetX = clamp(offsetX, -maxOffset, maxOffset);
-      offsetY = clamp(offsetY, -maxOffset, maxOffset);
+      const videoRect = videoPreview.getBoundingClientRect();
+      const maxOffsetX = (videoRect.width * scale - videoRect.width) / 2 / scale;
+      const maxOffsetY = (videoRect.height * scale - videoRect.height) / 2 / scale;
+      offsetX = clamp(offsetX, -maxOffsetX, maxOffsetX);
+      offsetY = clamp(offsetY, -maxOffsetY, maxOffsetY);
       applyTransform();
     }
   };
@@ -326,9 +448,13 @@ const initApp = () => {
     const p = e.touches ? e.touches[0] : e;
     const deltaX = p.clientX - startX;
     const deltaY = p.clientY - startY;
-    const maxOffset = (videoPreview.offsetWidth * (scale - 1)) / 2;
-    offsetX = clamp(startMoveX + deltaX, -maxOffset, maxOffset);
-    offsetY = clamp(startMoveY + deltaY, -maxOffset, maxOffset);
+    
+    const videoRect = videoPreview.getBoundingClientRect();
+    const maxOffsetX = (videoRect.width * scale - videoRect.width) / 2 / scale;
+    const maxOffsetY = (videoRect.height * scale - videoRect.height) / 2 / scale;
+    
+    offsetX = clamp(startMoveX + deltaX, -maxOffsetX, maxOffsetX);
+    offsetY = clamp(startMoveY + deltaY, -maxOffsetY, maxOffsetY);
     applyTransform();
   };
 
@@ -346,7 +472,35 @@ const initApp = () => {
     sizeOut.textContent = sizeSlider.value;
   });
 
-  // ИЗМЕНЕНИЕ: Добавляем слушатель на ресайз окна
+  convertButton.addEventListener('click', () => {
+    if (!videoMetadata.job_id) {
+      alert('Нет активной сессии для видео. Пожалуйста, загрузите видео заново.');
+      return;
+    }
+    
+    if (!chatInput.value) {
+      alert('Пожалуйста, укажите ID чата или название канала.');
+      chatInput.focus();
+      return;
+    }
+
+    const [start, end] = durationSlider.get().map(Number);
+    const options = {
+      offset: start,
+      clip_sec: end - start,
+      size: Number(sizeSlider.value),
+      chat: chatInput.value,
+      scale: scale,
+      offsetX: offsetX,
+      offsetY: offsetY,
+      previewWidth: videoPreview.getBoundingClientRect().width,
+      videoWidth: videoMetadata.width,
+      videoHeight: videoMetadata.height,
+    };
+    
+    initWebSocket(videoMetadata.job_id, options);
+  });
+
   window.addEventListener('resize', updateScrubberAppearance);
 
   showUploader();

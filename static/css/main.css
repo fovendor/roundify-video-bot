@@ -281,14 +281,30 @@ h1 {
 
 input[type=text] {
   width: 100%;
-  padding: 1rem;
-  border: none;
+  /* Уменьшаем padding, чтобы компенсировать рамку в 2px */
+  padding: calc(1rem - 2px); 
+  /* Добавляем прозрачную рамку, чтобы избежать "скачка" при фокусе */
+  border: 2px solid transparent; 
   border-radius: var(--radius-m);
   font-size: 1rem;
   color: var(--font-color);
   margin-top: 1.5rem;
   background: var(--surface);
   box-shadow: inset 1px 1px 2px var(--sh-dark), inset -1px -1px 2px var(--sh-light);
+  /* Плавный переход для всех свойств: фона, рамки, тени */
+  transition: all 0.2s ease-in-out; 
+}
+
+input[type=text]:focus {
+  /* Убираем стандартную обводку браузера */
+  outline: none;
+  /* Делаем нашу прозрачную рамку акцентной */
+  border-color: var(--accent);
+  /* Добавляем внешнее свечение, сохраняя при этом внутреннюю тень */
+  box-shadow: 
+    inset 1px 1px 2px var(--sh-dark), 
+    inset -1px -1px 2px var(--sh-light),
+    0 0 8px var(--accent-glow);
 }
 
 #token,
@@ -429,6 +445,18 @@ input[type=range]::-webkit-slider-thumb {
 /* --- Вспомогательные классы --- */
 .hidden {
   display: none !important;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    /* Принудительно задаем наш цвет текста */
+    -webkit-text-fill-color: var(--font-color) !important;
+
+    /* Хак с тенью для перекраски фона. Он должен быть здесь,
+       чтобы перекрыть любые фоновые изменения от браузера. */
+    -webkit-box-shadow: 0 0 0 40px var(--surface) inset !important;
 }
 
 @media(max-width:600px) {

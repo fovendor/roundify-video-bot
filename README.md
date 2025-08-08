@@ -1,17 +1,17 @@
 # RoundiPy
 
-**Roundipy** is a web service that converts any video into a perfect circular Telegram Video Note. The conversion process features a real-time progress bar via WebSocket, and the result can be instantly sent to Telegram.
+**Roundipy** is a web service that converts any video into a perfect circular Telegram Video Note. The conversion process features real-time progress indicators, and the result can be instantly sent to Telegram.
 
 ▶ **Live Demo:** [https://roundipy.ether-memory.com](https://roundipy.ether-memory.com)
 
 ## Key Features
 
-- 💿 **Perfect Crop:** Video is automatically cropped to a square and scaled to the desired resolution (240-1024px).
-- 🖼️ **Interactive Framing:** Zoom and pan the video to select the perfect frame for your video note.
-- 📊 **Integrated Progress Bar:** Track the conversion process in real-time.
+- 💿 **Perfect Crop:** Video is interactively cropped to a square and scaled to the desired resolution (240-640px).
+- 🖼️ **Interactive Framing:** Zoom and pan the video in real-time to select the perfect frame for your video note.
+- 📊 **Real-time Feedback:** The UI provides live progress for both file uploading and video conversion, ensuring the user is always informed.
 - ⏱️ **Flexible Settings:** Easily adjust the duration and start offset for the clip you want to create.
 - 🤖 **Telegram Integration:** Provide a chat ID, and the finished video note will be sent directly to Telegram using the server-configured bot.
-- 🗑️ **Stateless & Secure:** No files are stored on the server. Videos are processed in memory and immediately deleted after being sent.
+- 🗑️ **Stateless & Secure:** No files are permanently stored. Videos are processed and immediately deleted after being sent.
 - ⚙️ **Parallel Tasks:** The service can process multiple videos simultaneously (the number of workers is configurable).
 
 ## Architecture
@@ -27,7 +27,7 @@ Before the server starts accepting requests, it performs a critical self-check:
 
 **2. User Request Lifecycle**
 
-Once the server is running, it processes user requests according to the following sequence:
+Once the server is running, it processes user requests according to the following sequence. This flow is designed to get necessary video metadata upfront for correct processing.
 
 ```mermaid
 sequenceDiagram
@@ -36,12 +36,12 @@ sequenceDiagram
     participant FFmpeg as FFmpeg Task (Background)
     participant Telegram as Telegram API
 
-    Client->>+Server: (1) POST /api/upload (file)
-    Server->>-Client: (2) Response: {job_id, meta}
+    Client->>+Server: (1) POST /api/upload (video file with progress)
+    Server->>-Client: (2) Response: {job_id, original_width, original_height}
     Client->>+Server: (3) WebSocket /ws/{job_id}
     Server-->>-Client: WebSocket Connected
-    Client->>Server: (4) WS Message: {type: "start_conversion", ...}
-    Server->>+FFmpeg: (5) Starts background task
+    Client->>Server: (4) WS Message: {type: "start_conversion", options...}
+    Server->>+FFmpeg: (5) Starts background task with correct frame data
     loop During conversion
         FFmpeg-->>Server: (6) Progress (pipe)
         Server-->>Client: (7) WS Message: {type: "progress", ...}
@@ -54,6 +54,31 @@ sequenceDiagram
 
 ## Deployment
 
+### Quick Start (Local)
+
+This method is suitable for local development and testing.
+
+```bash
+# Install system dependencies (example for Debian/Ubuntu)
+sudo apt-get install ffmpeg python3-venv
+
+# Clone the repository
+git clone https://github.com/your-repo/roundipy.git
+cd roundipy
+
+# Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install Python packages
+pip install -r requirements.txt
+
+# Run the server with your Telegram token
+TELEGRAM_BOT_TOKEN="your_token_here" uvicorn app:app --host 0.0.0.0 --port 8000
+
+# Open http://localhost:8000 in your browser
+```
+
 ### Docker Compose Deployment (Recommended)
 
 This is the easiest and most reliable way to run the service in production.
@@ -62,7 +87,7 @@ This is the easiest and most reliable way to run the service in production.
 
 Create this file in the project root. You **must** specify your Telegram Bot Token.
 
-```yaml
+```yml
 services:
   roundipy:
     build: .
@@ -104,20 +129,23 @@ docker compose build
 docker compose up -d
 ```
 
-**3. View Logs**
+## Management and Monitoring
 
-```bash
-docker compose logs -f roundipy
-```
+### View Logs
 
-## API and Request Lifecycle
+To view logs for the service, use the command:
+`docker compose logs roundipy`
 
-| Method | Path | Description |
-| --- | --- | --- |
-| GET | /   | Serves the main page. |
-| POST | /api/upload | **Step 1:** Accepts a video, saves it temporarily, returns metadata (duration, resolution) and a `job_id`. |
-| WS  | /ws/{job_id} | **Step 2:** Establishes a WebSocket connection. The client sends a `start_conversion` message with options (crop, scale, timing, chat_id) to begin. The server sends real-time events: `queued`, `progress`, `done`, `error`. |
-| GET | /ping | Health check, responds with `pong`. |
+To follow the logs in real-time (useful for debugging), use the `-f` flag:
+`docker compose logs -f roundipy`
+
+### Security and File Auditing
+
+The service is designed to be stateless.
+
+- Uploaded videos are temporarily stored in the `/tmp/roundipy_ws` directory *inside the container*.
+- To verify that files are being deleted, you can access the container's shell while it's running: `docker exec -it roundipy /bin/sh`
+- Inside the shell, check the contents of the directory: `ls -l /tmp/roundipy_ws`. This directory should only contain files during an active conversion. It will be empty immediately after the process finishes (successfully or with an error), guaranteeing that user videos are not stored.
 
 ## Environment Variables
 
