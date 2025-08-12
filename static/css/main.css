@@ -41,8 +41,8 @@ body {
 }
 
 .card-wrapper {
-  background: linear-gradient(135deg, #ff00cc, #3333ff); /* градиент рамки */
-  padding: 4px; /* толщина рамки */
+  background: linear-gradient(135deg, #ff00cc, #3333ff);
+  padding: 4px;
   border-radius: var(--radius-l);
   width: fit-content;
   margin: auto;
@@ -50,7 +50,7 @@ body {
 }
 
 .card {
-  background: var(--surface-gradient); /* тёмный фон внутри */
+  background: var(--surface-gradient);
   border-radius: var(--radius-l);
   width: clamp(320px, 90vw, 420px);
   padding: 2rem;
@@ -64,7 +64,8 @@ h1 {
   color: var(--font-color);
 }
 
-/* --- Начальный экран --- */
+ /* ───────────── First screen ───────────── */
+
 #uploadScreen,
 .video-area {
   width: 100%;
@@ -108,7 +109,8 @@ h1 {
   text-transform: uppercase;
 }
 
-/* --- Экран плеера --- */
+ /* ───────────── Second screen ───────────── */
+
 #playerScreen {
   display: flex;
   flex-direction: column;
@@ -159,7 +161,6 @@ h1 {
   height: 70%;
 }
 
-/* --- Круговой скраббер --- */
 .scrubber-svg {
   position: absolute;
   top: 0;
@@ -190,14 +191,11 @@ h1 {
 .scrubber-handle {
   fill: var(--accent);
   stroke: var(--surface);
-  /* r: 10; <-- ЭТА СТРОКА УДАЛЕНА. Теперь радиус контролируется JS */
   filter: drop-shadow(0 2px 4px var(--sh-dark));
   pointer-events: all;
   cursor: pointer;
 }
 
-
-/* --- Новая панель инструментов --- */
 .tool-controls {
   display: flex;
   justify-content: space-around;
@@ -212,15 +210,15 @@ h1 {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: linear-gradient(145deg, #46436a, #1c1d22); /* неоморфный градиент */
-  border: 2px solid #1e1f26; /* тонкая тёмная обводка */
+  background: linear-gradient(145deg, #46436a, #1c1d22);
+  border: 2px solid #1e1f26;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow:
     5px 5px 10px rgba(0, 0, 0, 0.5),
     -5px -5px 10px rgba(255, 255, 255, 0.03),
-    inset 0 0 0 0 transparent; /* будет меняться при active */
+    inset 0 0 0 0 transparent;
   transition: all 0.2s ease-out;
 }
 
@@ -256,7 +254,6 @@ h1 {
   color: var(--font-color);
 }
 
-/* --- Элементы управления --- */
 .controls {
   margin-top: 2rem;
 }
@@ -281,9 +278,8 @@ h1 {
 
 input[type=text] {
   width: 100%;
-  /* Уменьшаем padding, чтобы компенсировать рамку в 2px */
   padding: calc(1rem - 2px); 
-  /* Добавляем прозрачную рамку, чтобы избежать "скачка" при фокусе */
+  /* Add a transparent frame to avoid "jumping" when focusing */
   border: 2px solid transparent; 
   border-radius: var(--radius-m);
   font-size: 1rem;
@@ -291,18 +287,14 @@ input[type=text] {
   margin-top: 1.5rem;
   background: var(--surface);
   box-shadow: inset 1px 1px 2px var(--sh-dark), inset -1px -1px 2px var(--sh-light);
-  /* Плавный переход для всех свойств: фона, рамки, тени */
   transition: all 0.2s ease-in-out; 
 }
 
 input[type=text]:focus {
-  /* Убираем стандартную обводку браузера */
   outline: none;
-  /* Делаем нашу прозрачную рамку акцентной */
   border-color: var(--accent-muted);
 }
 
-#token,
 #chat {
   user-select: text;
 }
@@ -310,7 +302,7 @@ input[type=text]:focus {
 #convertButton {
   width: 100%;
   padding: 1rem;
-  border: 2px solid var(--accent-muted); /* тонкая тёмная обводка */
+  border: 2px solid var(--accent-muted);
   border-radius: var(--radius-m);
   font-size: 1.2rem;
   margin-top: 2rem;
@@ -344,7 +336,7 @@ input[type=text]:focus {
   cursor: not-allowed;
 }
 
-/* --- Стили для noUiSlider --- */
+ /* ───────────── Styles for noUiSlider ───────────── */
 .noUi-target {
   background: var(--surface-inset);
   border-radius: 5px;
@@ -407,7 +399,6 @@ input[type=text]:focus {
   box-shadow: 3px 3px 6px var(--sh-dark);
 }
 
-/* --- Range Input --- */
 input[type=range] {
   -webkit-appearance: none;
   appearance: none;
@@ -437,7 +428,6 @@ input[type=range]::-webkit-slider-thumb {
   box-shadow: 3px 3px 6px var(--sh-dark), -3px -3px 6px var(--sh-light);
 }
 
-/* --- Вспомогательные классы --- */
 .hidden {
   display: none !important;
 }
@@ -446,11 +436,10 @@ input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-    /* Принудительно задаем наш цвет текста */
     -webkit-text-fill-color: var(--font-color) !important;
 
-    /* Хак с тенью для перекраски фона. Он должен быть здесь,
-       чтобы перекрыть любые фоновые изменения от браузера. */
+    /* Shadow hack to recolor background. This should be here to 
+       to cover any background changes from the browser. */
     -webkit-box-shadow: 0 0 0 40px var(--surface) inset !important;
 }
 

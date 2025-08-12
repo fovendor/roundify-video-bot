@@ -72,21 +72,20 @@ const initWebSocket = (jobId, options) => {
 
 
 const initApp = () => {
-  /* ─── Константы ───────────────────────────────────────────── */
+  /* ───────────── Constants ───────────── */
   const MAX_CLIP_SECONDS = 60;
   const MIN_SCALE = 1;
   const MAX_SCALE = 4;
   const SCALE_SENSITIVITY = 0.005;
   const SLIDER_ZOOM_WINDOW_SECONDS = 120;
   const TOOLTIP_MERGE_DISTANCE = 50;
-  const SCRUBBER_RADIUS = 90;
 
-  /* ─── DOM-элементы ────────────────────────────────────────── */
+  /* ───────────── DOM ───────────── */
   const uploadScreen = document.getElementById('uploadScreen');
   const playerScreen = document.getElementById('playerScreen');
 
   const fileInput = document.getElementById('fileInput');
-  const touchMeText = document.getElementById('touchMeText'); // <-- НОВЫЙ ЭЛЕМЕНТ
+  const touchMeText = document.getElementById('touchMeText');
   const videoPreview = document.getElementById('videoPreview');
   const videoOverlay = document.getElementById('videoOverlay');
 
@@ -116,7 +115,7 @@ const initApp = () => {
   const convertBtnLabel = document.getElementById('convertBtnLabel');
   const btnLoader = document.getElementById('btnLoader');
 
-  /* ─── Состояние ───────────────────────────────────────────── */
+  /* ───────────── State ───────────── */
   let videoFile = null;
   let videoObjectURL = null;
   let videoMetadata = {};
@@ -126,7 +125,7 @@ const initApp = () => {
   let startX = 0, startY = 0;
   let startScale = 1, startMoveX = 0, startMoveY = 0;
 
-  /* ─── Хелперы ─────────────────────────────────────────────── */
+  /* ───────────── Helpers ───────────── */
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
   const formatTime = (seconds) => {
     const min = Math.floor(seconds / 60);
@@ -171,7 +170,7 @@ const initApp = () => {
     scrubberHandle.setAttribute('cy', point.y);
   };
 
-  /* ─── Переключение экранов ───────────────────────────────── */
+  /* ───────────── Switching screens ───────────── */
   const showPlayer = () => {
     uploadScreen.classList.add('hidden');
     playerScreen.classList.remove('hidden');
@@ -272,7 +271,7 @@ const initApp = () => {
     durationSlider.set([newStart, newStart + clipLength]);
   };
 
-  /* ─── Загрузка и управление видео ─────────────────────────── */
+ /* ───────────── Upload and manage videos ───────────── */
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file || !file.type.startsWith('video/')) return;
@@ -288,7 +287,6 @@ const initApp = () => {
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
         const percentComplete = Math.round((event.loaded / event.total) * 100);
-        // ОБНОВЛЯЕМ ТЕКСТ В КРУГЕ "TOUCH ME"
         touchMeText.textContent = `Загрузка ${percentComplete}%`;
       }
     };
@@ -316,7 +314,7 @@ const initApp = () => {
     const handleUploadError = (message) => {
         console.error('Upload failed:', message);
         alert(`Не удалось загрузить видео: ${message}`);
-        showUploader(); // showUploader сбросит текст на "Touch Me"
+        showUploader();
     };
 
     xhr.send(formData);
@@ -324,9 +322,9 @@ const initApp = () => {
 
 
   videoPreview.addEventListener('loadedmetadata', () => {
-    showPlayer(); // Переключаем экран
+    showPlayer();
     initDurationSlider(videoPreview.duration);
-    convertButton.disabled = false; // Разрешаем нажимать кнопку отправки
+    convertButton.disabled = false;
     applyTransform();
     updateScrubberHandle(0, videoPreview.duration);
     updateScrubberAppearance();
@@ -348,7 +346,6 @@ const initApp = () => {
 
   deleteButton.addEventListener('click', showUploader);
 
-  /* ─── ЛОГИКА КРУГОВОГО СКРАББЕРА --- */
   const startScrub = (event) => {
     isScrubbing = true;
     videoPreview.pause();
@@ -396,7 +393,7 @@ const initApp = () => {
   scrubberHandle.addEventListener('mousedown', startScrub);
   scrubberHandle.addEventListener('touchstart', startScrub, { passive: false });
 
-  /* ─── Зум и перемещение кадра ────────────────────────────── */
+   /* ───────────── Zoom and move the frame ───────────── */
   const onResizeStart = (e) => {
     e.preventDefault();
     const p = e.touches ? e.touches[0] : e;

@@ -61,9 +61,7 @@ LOGGING_CONFIG = {
         },
     },
     "loggers": {
-        # Наш кастомный логгер
         "roundipy": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
-        # Логгеры Uvicorn
         "uvicorn": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
         "uvicorn.error": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
         "uvicorn.access": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
@@ -388,10 +386,6 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
     except Exception as e:
         log.error(f"WebSocket Error for job {job_id}: {e}")
 
-@app.get("/ping")
-async def ping():
-    return "pong"
-
 def check_telegram_token():
     if not TELEGRAM_BOT_TOKEN:
         log.error("CRITICAL: TELEGRAM_BOT_TOKEN environment variable not set. Application will not start.")
@@ -413,3 +407,8 @@ def check_telegram_token():
 @app.on_event("startup")
 async def startup_event():
     check_telegram_token()
+
+# ───────────── Monitoring ─────────────
+# @app.get("/ping")
+# async def ping():
+#     return "pong"
