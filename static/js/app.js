@@ -5,7 +5,7 @@ const initWebSocket = (jobId, options) => {
   const convertBtnLabel = document.getElementById('convertBtnLabel');
   const btnLoader = document.getElementById('btnLoader');
 
-  const wsUrl = `${location.protocol === 'https' ? 'wss' : 'ws'}://${location.host}/ws/${jobId}`;
+  const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/${jobId}`;
   const ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
@@ -186,6 +186,7 @@ const initApp = () => {
     videoFile = null;
     videoMetadata = {};
     fileInput.value = '';
+    fileInput.disabled = false;
     durationSlider = null;
 
     scale = 1; offsetX = 0; offsetY = 0; applyTransform();
@@ -275,6 +276,7 @@ const initApp = () => {
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file || !file.type.startsWith('video/')) return;
+    fileInput.disabled = true;
     videoFile = file;
 
     const formData = new FormData();
