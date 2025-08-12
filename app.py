@@ -338,14 +338,13 @@ async def api_upload(request: Request, video: UploadFile = File(...)):
 async def websocket_endpoint(websocket: WebSocket, job_id: str):
     await websocket.accept()
     log.info(f"WebSocket /ws/{job_id} [accepted]")
+    
+    conversion_task = None
     try:
         tmp_in = next(TMP.glob(f"in_{job_id}*"), None)
         if not tmp_in:
             await websocket.send_json(
-                {
-                    "type": "error",
-                    "message": "File not found for this job_id. Please upload again.",
-                }
+                {"type": "error", "message": "File not found for this job_id. Please upload again."}
             )
             return
 
@@ -357,10 +356,7 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
         clip_duration = float(opts.get("clip_sec", 0))
         if not (1 <= clip_duration <= MAX_CLIP_SECONDS):
             await websocket.send_json(
-                {
-                    "type": "error",
-                    "message": f"Duration must be between 1 and {MAX_CLIP_SECONDS} seconds.",
-                }
+                {"type": "error", "message": f"Duration must be between 1 and {MAX_CLIP_SECONDS} seconds."}
             )
             return
 
@@ -368,7 +364,7 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
         opts["max_mb"] = 8 if is_for_telegram else 100
         dst_filename = f"{tmp_in.stem}_round.mp4"
 
-        asyncio.create_task(
+        conversion_task = asyncio.create_task(
             run_ffmpeg_and_notify(
                 websocket=websocket,
                 job_id=job_id,
@@ -378,13 +374,32 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
             )
         )
 
-        while True:
-            await websocket.receive_text()
+        # Listener task to track client disconnections. Wait for the task to complete first.
+        # If the listener task completes first (the client disconnected), the conversion task must be explicitly canceled.
+        listener_task = asyncio.create_task(websocket.receive_text())
+        done, pending = await asyncio.wait(
+            [conversion_task, listener_task], return_when=asyncio.FIRST_COMPLETED
+        )
+
+        if listener_task in done:
+            log.info(f"Client {job_id} disconnected, cancelling conversion task.")
+            conversion_task.cancel()
+        
+        # Cancel hanging tasks
+        for task in pending:
+            task.cancel()
 
     except WebSocketDisconnect:
         log.info(f"Client {job_id} disconnected.")
+        # If the client disconnected before the conversion started, cancel the task if it was created
+        if conversion_task:
+            conversion_task.cancel()
+    except asyncio.CancelledError:
+        log.info(f"Task for job {job_id} was cancelled.")
     except Exception as e:
-        log.error(f"WebSocket Error for job {job_id}: {e}")
+        log.error(f"WebSocket Error for job {job_id}: {e}", exc_info=True)
+    finally:
+        log.info(f"WebSocket for job {job_id} is closing.")
 
 def check_telegram_token():
     if not TELEGRAM_BOT_TOKEN:
